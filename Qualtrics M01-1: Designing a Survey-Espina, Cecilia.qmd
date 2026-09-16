@@ -1,0 +1,34 @@
+---
+title: "Qualtrics M01-1: Designing a Survey"
+author: "Cecilia Espina"
+date: today
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+## Proof of Sharing with Instructor
+
+Screenshot showing the Qualtrics survey shared with Jae Jung (jmjung):
+
+![](images/four.png)
+
+## Rough Draft of Qualtrics Survey
+
+### Beginning of Survey
+
+![](images/one.png)
+
+### Middle of Survey
+
+![](images/two.png)
+
+### Ending of Survey
+
+![](images/three.png)
+
+## Appendix
+
+- GitHub Repo: https://github.com/espinacecilia-design/6500
+- GitHub Pages: [INSERT-PAGES-URL-HERE]
