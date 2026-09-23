@@ -1,0 +1,13 @@
+---
+title: "MR Educational Needs Survey - Qualtrics Assignment #1"
+author: "Cecilia Espina"
+date: today
+format:
+  html:
+    toc: false
+    embed-resources: true
+---
+
+## Qualtrics Survey Main Page
+
+![](images/survey-main-page.png)

@@ -31,4 +31,4 @@ Screenshot showing the Qualtrics survey shared with Jae Jung (jmjung):
 ## Appendix
 
 - GitHub Repo: https://github.com/espinacecilia-design/6500
-- GitHub Pages: [INSERT-PAGES-URL-HERE]
+- GitHub Pages: https://espinacecilia-design.github.io/6500/
