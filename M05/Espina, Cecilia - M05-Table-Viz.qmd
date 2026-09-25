@@ -1,0 +1,118 @@
+---
+title: "M05-Visualizing Data with Tables for MSDM CEP"
+author: "Cecilia Espina"
+date: today
+format: 
+  html: 
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-link: true
+    code-fold: true
+    code-tools: true
+    embed-resources: true
+theme: cosmo
+editor: visual
+execute: 
+  freeze: auto
+---# Essay Reflection
+
+## Summarize what you learned from the videos you watched.
+
+The first video, a conversation between Tom Mock and Rachael Dottle about the `gt` package, centered on principles for building high-quality tables in R, several of which were drawn from John Schwabish's work on effective data communication. Mock emphasized offsetting headers from the table body so readers can visually separate labels from data, using dividers and grid lines sparingly so structure doesn't turn into clutter, and using color or styling selectively to highlight outliers or notable values rather than decorating the whole table. He also discussed alignment conventions, right-aligning numeric columns so decimals line up for easy comparison, and left-aligning text for readability, along with choosing a level of numeric precision that matches both the accuracy of the underlying data and what the audience actually needs. He closed by introducing the `gtExtras` package as a way to speed up table-building with pre-built themes and features like sparklines and inline charts layered on top of standard `gt` code.
+
+The second video, presented by Greg Martin, was a more hands-on walkthrough of `gtExtras` in action. Using the iris dataset, he demonstrated `gt_plt_summary()`, which automatically generates a compact snapshot of a dataset's descriptive statistics, means, standard deviations, medians, and missing-value percentages, in a single table. With the mtcars dataset, he showed how to group data (for example, by number of cylinders) and build columns containing lists of values, then use `gt_plt_dist()` to replace raw numbers with a small graphical distribution directly inside a table cell. He also showed how a single line of code applying a built-in theme (like the Guardian theme) can restyle an entire table, and how `tab_header()` adds titles and subtitles on top of that.
+
+## What did you like about the gt and gtExtras packages demonstrated in the videos?
+
+What stood out most was how much visual polish `gtExtras` adds for relatively little code. Functions like `gt_plt_summary()` and `gt_plt_dist()` collapse what would normally take several separate summary tables and a set of standalone plots into a single, compact table, which feels especially useful for a capstone presentation where slide space is limited and the audience wants to scan results quickly rather than flip between a table and a chart. I also liked that `gtExtras` builds on top of base `gt` rather than replacing it, so the underlying logic (headers, alignment, spanners, footnotes) still applies, but a single theme call or plotting function handles a lot of the manual styling work Tom Mock described doing by hand in `gt`.
+
+## How do tables complement charts for data visualization?
+
+Charts are generally better at showing patterns, trends, and relationships at a glance, direction, magnitude, and shape are easy to read visually. Tables are better when the audience needs to see or reference precise values, compare many variables side by side, or look something up (like an exact mean, count, or percentage) rather than just get a general sense of the data. Used together, a chart can communicate the overall story while a table backs it up with the specific numbers a reader might want to verify or cite. The `gtExtras` functions shown in the videos (sparklines, inline distribution plots) essentially blend the two, embedding lightweight visual cues inside a table so a reader gets both the precise value and a quick visual sense of it in one place.
+
+## Under what circumstances would you prefer to use tables rather than charts to visualize data?
+
+Tables are the better choice when precision matters more than pattern,  for example, reporting exact survey percentages, financial figures, or KPI benchmarks where a stakeholder needs the actual number, not just a visual impression. They're also preferable when there are many variables or categories to compare simultaneously (more than a chart could reasonably display without becoming cluttered), when the audience is likely to reference the data later (like in a written report appendix), or when the values being compared don't have an obvious visual analog, categorical or demographic breakdowns, for instance, often read more clearly in a table than as a bar chart once there are more than a handful of categories.
+
+```{r}
+#| label: setup
+#| message: false
+
+library(gt)
+library(gtExtras)
+library(dplyr)
+
+# Preview the built-in pizzaplace dataset
+glimpse(pizzaplace)
+```
+
+```{r}
+#| label: wrangle
+
+pizza_summary <- pizzaplace |>
+  group_by(type) |>
+  summarize(
+    orders = n(),
+    avg_price = mean(price, na.rm = TRUE),
+    min_price = min(price, na.rm = TRUE),
+    max_price = max(price, na.rm = TRUE),
+    price_dist = list(price),
+    .groups = "drop"
+  )
+
+pizza_summary
+```
+
+```{r}
+#| label: gt-table
+
+pizza_summary |>
+  gt(rowname_col = "type") |>
+  tab_header(
+    title = "Pizza Place Order Summary by Type",
+    subtitle = "Order counts, pricing, and price distribution across pizza types"
+  ) |>
+  tab_stubhead(label = "Pizza Type") |>
+  cols_label(
+    orders = "Total Orders",
+    avg_price = "Avg. Price",
+    min_price = "Min. Price",
+    max_price = "Max. Price",
+    price_dist = "Price Distribution"
+  ) |>
+  tab_spanner(
+    label = "Pricing ($)",
+    columns = c(avg_price, min_price, max_price)
+  ) |>
+  fmt_currency(
+    columns = c(avg_price, min_price, max_price),
+    decimals = 2
+  ) |>
+  fmt_number(
+    columns = orders,
+    decimals = 0
+  ) |>
+  gt_plt_dist(
+    column = price_dist,
+    type = "density",
+    line_color = "steelblue",
+    fill_color = "lightblue"
+  ) |>
+  data_color(
+    columns = avg_price,
+    palette = c("white", "darkorange")
+  ) |>
+  tab_source_note(
+    source_note = "Source: pizzaplace dataset, gt package."
+  ) |>
+  tab_footnote(
+    footnote = "Price distribution shows the spread of individual order prices within each pizza type.",
+    locations = cells_column_labels(columns = price_dist)
+  ) |>
+  gt_theme_538()
+```
+
+## Why this table is worth adding to the MSDM project report or presentation
+
+This table condenses four separate metrics, order volume, average price, price range, and price distribution, into a single view that a stakeholder can scan in seconds. For a capstone presentation, that matters because slide time is limited: rather than showing a bar chart of order counts and a separate boxplot of pricing, this one table conveys both the "how many" and "how much, and how consistently" story at once. The colored average-price column draws the eye straight to the highest-margin category (chicken pizzas), and the inline distribution sparklines let a reader see at a glance whether prices cluster tightly (like veggie) or spread widely (like classic) without needing a separate chart. It's the kind of table that could stand on its own in a written report appendix while still being clean enough to project during a live presentation.
