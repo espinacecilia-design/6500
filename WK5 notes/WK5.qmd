@@ -1,0 +1,49 @@
+---
+title: "Class Notes for Week 5"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-expand: 1
+    toc-location: right
+    embed-resources: true
+execute:
+  freeze: auto
+---
+
+## In class notes Sept. 24th
+
+**Research Process**
+
+- Defining the problem
+
+- Developing an approach to the problem (Ch. 2) 
+
+  - Exploratory research
+
+  - Formulate research questions and hypotheses
+
+    - Including theoretical framework, analytical models 
+
+    - AO doesn’t have specific hypothesis in mind
+
+- Formulate research design (ch.3) 
+
+  - Methods for collecting
+
+  - Measurement and scale
+
+  - Questionnaire design
+
+  - Sampling process and sample size
+
+**Applied research example from marketing research consulting class**
+
+- raising questions when there isn’t enough info
+
+- “What are the high priority targets?”
+
+  *\*Went over syllabus and course schedule for about 45 minutes.\**
+
+-
