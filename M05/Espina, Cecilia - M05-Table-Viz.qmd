@@ -118,4 +118,10 @@ pizza_summary |>
 ## Why this table is worth adding to the MSDM project report or presentation
 
 This table condenses four separate metrics, order volume, average price, price range, and price distribution, into a single view that a stakeholder can scan in seconds. For a capstone presentation, that matters because slide time is limited: rather than showing a bar chart of order counts and a separate boxplot of pricing, this one table conveys both the "how many" and "how much, and how consistently" story at once. The colored average-price column draws the eye straight to the highest-margin category (chicken pizzas), and the inline distribution sparklines let a reader see at a glance whether prices cluster tightly (like veggie) or spread widely (like classic) without needing a separate chart. It's the kind of table that could stand on its own in a written report appendix while still being clean enough to project during a live presentation. 
+
+# Appendix
+
+- GitHub Repository: [https://github.com/espinacecilia-design/6500](https://github.com/espinacecilia-design/6500)
+- GitHub Pages (Published Report): [https://espinacecilia-design.github.io/6500/M05/Espina,%20Cecilia%20-%20M05-Table-Viz.html](https://espinacecilia-design.github.io/6500/M05/Espina,%20Cecilia%20-%20M05-Table-Viz.html)
+
 ---
