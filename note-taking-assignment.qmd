@@ -200,5 +200,5 @@ Steiger, James H., Alexander Shapiro, and Michael W. Browne. 1985. “On the Mul
 
 # Appendix
 
-- [GitHub Repository](https://github.com/TODO-your-username/TODO-your-repository)
-- [Published Article Notes on GitHub Pages](https://TODO-your-username.github.io/TODO-your-repository/)
+- [GitHub Repository](https://github.com/espinacecilia-design/6500)
+- [Published Article Notes on GitHub Pages](https://espinacecilia-design.github.io/6500/note-taking-assignment.html)
