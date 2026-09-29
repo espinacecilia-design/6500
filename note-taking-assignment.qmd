@@ -1,0 +1,204 @@
+---
+title: "Article Notes: The Two-Step Approach to Structural Equation Modeling"
+author: "Cecilia Espina"
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    embed-resources: true
+---
+
+# Introduction
+
+- The article is a practical guide for researchers who use structural equation modeling (SEM) to test and develop theory. The authors argue that SEM is powerful but easy to misuse.
+- SEM can be thought of as two conceptually different models:
+    1. A **measurement model** (confirmatory factor analysis) that links observed indicators to the latent constructs they are supposed to measure, with the constructs allowed to correlate freely.
+    2. A **structural model** that lays out the causal relations among the constructs, as proposed by a theory.
+- Modern software (EQS, LISREL) can estimate both parts at the same time in a **one-step** analysis. The authors point out that being *able* to do this does not make it the *best* way to build a model.
+- Their main argument is that researchers gain a lot by estimating and fixing the measurement model **first**, and only then estimating the structural model (the **two-step approach**).
+- The two steps map onto three kinds of validity:
+    - The measurement model gives a confirmatory check of **convergent** and **discriminant validity**.
+    - If those hold, testing the structural model becomes a confirmatory check of **nomological validity** (whether the constructs relate to each other as theory predicts).
+- The article is organized as background, the confirmatory measurement model, and then the one-step versus two-step comparison.
+
+# Background
+
+## Exploratory Versus Confirmatory Analyses
+
+- The exploratory/confirmatory split is not a clean dichotomy in real research. Most studies are partly both, so it is better seen as an **ordered progression**.
+- Factor analysis illustrates the progression:
+    - Purely exploratory factor analysis: no prior idea of how many factors there are.
+    - Next step: maximum likelihood (ML) or generalized least squares (GLS) exploratory analysis, where the researcher picks a number of factors and tests how well that solution fits.
+    - Confirmatory analysis: the measurement model is specified *before* looking at results, and many loadings are fixed (usually at zero). The authors say "restricted analysis" might actually be a more accurate name.
+- In practice, first-try measurement models almost always fit poorly, so researchers revise and re-estimate on the same data. That means the work is **not purely confirmatory**.
+- After a model fits acceptably, the ideal next step is **cross-validation** on a new sample, either by re-estimating freely or (the strictest test) by fixing the parameters at the earlier estimates.
+
+## Complementary Approaches for Theory Testing Versus Predictive Application
+
+- SEM has two different purposes, and each pairs with a different estimation method and underlying model:
+    - **Theory testing and development:** full-information estimation (ML or GLS) with the common factor model.
+    - **Prediction and application:** partial least squares (PLS) with the principal-component model.
+- Strengths of ML/GLS for theory testing:
+    - The common factor model separates random error and measure-specific variance ("uniqueness") from the construct, so construct correlations are corrected for attenuation.
+    - It gives the most efficient estimates and an overall test of model fit.
+    - Cost: factor scores are indeterminate, which slightly hurts individual-level prediction (not a concern for theory testing).
+- Strengths of PLS for prediction:
+    - All variance in the indicators is treated as useful, so latent variables are exact combinations of indicators and individual scores can be predicted well.
+- Weaknesses of PLS:
+    - It does not assume or assess unidimensionality, so the meaning of the latent variables is questionable.
+    - It is less efficient, needs bootstrap/jackknife for standard errors, has no overall fit test, and is only fully correct with very large samples and many indicators. Construct correlations tend to be underestimated and indicator-construct correlations overestimated.
+- The two approaches are complementary choices depending on the research goal. The rest of the article focuses on ML/GLS for theory testing.
+
+## Estimation Methods
+
+- Maximum likelihood has been the dominant method since SEM began in the 1960s. Under multivariate normality, ML estimates are unbiased, consistent, and efficient in large samples, and both parameter tests and an overall chi-square test are available.
+- Problem: with moderate non-normality, the parameter estimates hold up reasonably well, but the **standard errors and overall chi-square are unreliable**. Peaked (leptokurtic) data leads to rejecting good models too often; flat (platykurtic) data does the reverse.
+- Newer methods relax the normality assumption:
+    - Generalized least squares (GLS) is a family of methods that minimize a weighted function of the residuals; the choice of the weight matrix **U** defines the specific method (identity matrix = unweighted least squares; a matrix updated by current estimates can reproduce ML).
+    - **Asymptotically distribution-free (ADF)** estimation (called AGLS in EQS and WLS in LISREL 7) makes no distributional assumption, but the weight matrix becomes huge (about 22,155 unique elements with just 20 variables), which makes it computationally impractical for many variables.
+    - Approximations exist to get around this (linearized estimators in EQS; diagonally weighted least squares in LISREL 7).
+    - **Elliptical estimation** (EQS) allows a shared, non-zero kurtosis, which is more flexible than normal but simpler than full ADF.
+    - **ARLS** is a more ambitious method that updates the weight matrix at each iteration.
+- Two other issues addressed: analyzing correlations instead of covariances requires adjustments to get correct standard errors and chi-square, and ordinal data should use polychoric/polyserial correlations (PRELIS handles this).
+- The authors' takeaway: the newer methods are important advances, but it is not yet clear they will replace normal-theory ML in practice. Researchers should check normality and weigh the reasonableness of the normality assumption against the large sample sizes that non-normal methods need.
+
+# Confirmatory Measurement Model
+
+- The confirmatory measurement model says observed measures (**x**) are produced by underlying factors (ξ) through factor loadings (Λ), plus error (δ). The error includes random measurement error and measure-specific variance.
+- The factors are allowed to correlate freely (the Φ matrix). The model implies a covariance matrix for the indicators: Σ = ΛΦΛ' + Θδ.
+
+## Need for Unidimensional Measurement
+
+- **Unidimensionality** means each set of indicators for a construct reflects only one underlying construct. The authors call it a crucial step, because a construct cannot be given a clear meaning unless its indicators are acceptably unidimensional.
+- Two necessary conditions are used to check it:
+    - **Internal consistency:** indicators of the same construct should correlate with each other in a way consistent with a single common factor (the Spearman-type equality and product rule). It needs at least four indicators to test.
+    - **External consistency:** indicators of one construct should relate to indicators of *other* constructs in a pattern consistent with the constructs' own relationship. Internal consistency is a special case of external consistency.
+    - When a construct has fewer than four indicators, external consistency becomes the only usable criterion.
+- **Multiple-indicator** measurement models are preferred because each construct is defined by at least two indicators, and each indicator measures only one construct (called *congeneric* measurement). This gives the least ambiguous meaning to constructs.
+- Models with **correlated measurement errors** or indicators that load on more than one construct do not give unidimensional measurement, so the constructs' meanings become problematic.
+- The authors acknowledge a criticism from Cattell: individual items are often factorially complex, so a "unidimensional" set of items might just be a "bloated specific" (narrow) trait. They mostly agree, and suggest the two views fit together if the analysis moves to composites of items and then examines higher-order factors (second-order factor analysis).
+
+## Specification
+
+- **Setting the metric of factors:** for the model to be identified, the factor scales must be set. The authors prefer fixing factor variances at 1.0 (diagonal of Φ), rather than fixing one loading per factor at 1.0, because this lets you test the significance of every loading.
+- **Single indicators:** sometimes a construct has only one indicator. The error variance then has to be set, ideally from prior research. If none exists, the choice is arbitrary; conservative options include setting error to a fraction of the indicator's variance, or to the smallest error variance among the other indicators (which is at least tied to the same sample and instrument).
+- **Sample size:** because full-information estimation relies on large-sample properties, sample size matters. Simulation work showed bias is negligible even at n = 50, but estimates can vary a lot from sample to sample, so about **150 or more** is usually needed for usably small standard errors.
+- Small samples are also more prone to **nonconvergence** (the algorithm cannot settle) and **improper solutions** (impossible values such as negative variances). About 150 usually suffices with three or more indicators per factor; two-indicator factors can be troublesome.
+- Methods that use higher-order moments (like ADF) require much larger samples. Early studies suggested at least 400 to 500, and even at 500 some estimates showed unacceptable bias.
+
+## Assessment of Fit
+
+- After getting a converged, proper solution, researchers check overall fit with goodness-of-fit indices, such as the chi-square test, the goodness-of-fit index, root-mean-square residual, and the normed and nonnormed fit indices.
+- **Convergent validity** is checked by asking whether each indicator's loading on its intended construct is significant (larger than twice its standard error).
+- **Discriminant validity** is checked for a pair of constructs by fixing their correlation at 1.0 and comparing that model to the free model with a chi-square difference test. A significantly better fit for the free model shows the constructs are not perfectly correlated.
+    - The test should be run **one pair at a time**, not all pairs at once, so a nonsignificant pair is not hidden among significant ones.
+    - A complementary check is whether the confidence interval (±2 standard errors) around the correlation includes 1.0.
+    - The authors note this is a necessary but not sufficient condition, so practical importance still depends on context.
+
+## Respecification
+
+- Most measurement models need some respecification, but changes should be driven by **theory and content**, not only statistics. This limits the number of models worth trying and reduces the chance of capitalizing on chance.
+- First fixes are often for nonconvergence or improper solutions. Causes of improper solutions include sampling variation with true values near zero, a misspecified model, or underidentification. If a negative estimate's confidence interval includes plausible positive values, sampling error is the likely culprit, and it can be fixed at zero or a tiny positive value without hurting the rest of the model.
+- When fit is poor, there are four ways to handle an indicator that is not working:
+    1. Relate it to a different factor.
+    2. Delete it.
+    3. Relate it to multiple factors.
+    4. Allow correlated errors.
+    - The first two **preserve** unidimensionality and are preferred. The last two blur the meaning of the constructs.
+- Correlated errors are only justified when planned in advance (for example, the same item measured at multiple time points). Using them after the fact takes advantage of chance, costs only one degree of freedom, and can hide the true structure.
+- Tools for locating problems:
+    - **Patterns of residuals:** an indicator assigned to the wrong factor shows large negative residuals with the indicators of its assigned factor (overfitting) and large positive residuals with the factor it should belong to (underfitting). Multidimensional indicators show large residuals with indicators of more than one factor.
+    - **Similarity coefficients:** summarize internal and external consistency; indicators of the same factor should typically be about .8 or higher.
+    - **Multiple-groups analysis:** defines each construct as a simple sum of its indicators, so misspecification is easier to localize (a misassigned indicator will load higher on the correct factor).
+- These sources of information should be used together with content knowledge. Sometimes a model can be judged acceptable even if the chi-square is significant, if the fit indices and residuals look good.
+
+# One-Step Versus Two-Step Modeling Approaches
+
+- Main claim: separately estimating and fixing the measurement model *before* simultaneously estimating measurement and structural parts has large benefits. The approach uses nested models, pseudo chi-square tests, and sequential chi-square difference tests (SCDTs).
+
+## The Confirmatory Structural Model
+
+- The structural model describes causal relations among the constructs: η = Bη + Γξ + ζ.
+    - **Endogenous** constructs (η) have their causes specified inside the model; **exogenous** constructs (ξ) have causes outside the model.
+    - **B** holds effects of endogenous constructs on each other, **Γ** holds effects of exogenous on endogenous constructs, and **ζ** is the residual/disturbance.
+- In the full model, x indicators belong to exogenous constructs and y indicators to endogenous constructs, each with its own measurement submodel.
+- **Interpretational confounding** (Burt): when the meaning of a latent variable, as determined empirically by the data, differs from the meaning the researcher assigned it beforehand.
+    - In a one-step approach with misspecification (the usual case), the loadings can shift depending on how the structural model is specified. Marked changes in loadings across alternative structural models are a sign of it.
+    - Estimating the measurement model first minimizes this, because no structural constraints are placed on the constructs' relations. If measurement is acceptably unidimensional, the loadings should barely change when structural models are added.
+    - In a one-step approach the problem may go undetected, so fit is maximized at the expense of interpretable constructs.
+
+## Recommended Two-Step Modeling Approach
+
+**Step 1: Evaluate the measurement model**
+
+- The measurement model represents how indicators relate to constructs, and how the constructs correlate, with no structural paths imposed. In effect, it is the "saturated" structural model where every construct is allowed to relate to every other.
+- It is evaluated separately so problems in measurement can be found and fixed *before* interpreting any relationships among constructs.
+- This step tells researchers whether indicators reflect their intended constructs:
+    - **Unidimensionality:** each indicator belongs to one construct (checked with residuals, similarity coefficients, etc.).
+    - **Convergent validity:** loadings are significant.
+    - **Discriminant validity:** constructs are distinguishable (correlations significantly less than 1.0).
+- If fit is poor, respecify the measurement model using theory and content (reassign or drop indicators rather than adding correlated errors), then re-estimate. The structural model should not be interpreted until the measurement model is acceptable.
+- A helpful check at this point is the **pseudo chi-square test**: it takes the chi-square of the measurement model (the best fit any structural model could achieve) with the degrees of freedom of the null structural model (the most any structural model could have). If this is significant, no structural model can fit, which points to a basic measurement problem, and there is no reason to test more structural models. A one-step approach cannot reveal this.
+
+**Step 2: Evaluate the structural model**
+
+- The structural model represents the hypothesized causal relations among constructs. It differs from the measurement model because it *constrains* the construct relationships (usually by fixing some paths to zero), whereas the measurement model lets all constructs correlate freely.
+- It comes second because those relationships are only meaningful if the constructs are measured well. Testing structure on shaky measurement risks confusing measurement problems with theory problems.
+- The authors use **five nested structural models**, ordered from most constrained to least: Mn (null) < Mc (next most likely constrained alternative) < Mt (the researcher's theoretical model) < Mu (next most likely unconstrained alternative) < Ms (saturated, equivalent to the measurement model).
+- A **sequential chi-square difference test (SCDT)** compares two nested models. The difference in chi-square (with the difference in degrees of freedom) tests whether the more constrained model explains the construct covariances significantly worse. If not, the simpler model is tentatively accepted.
+- The SCDTs can be made asymptotically independent (Steiger, Shapiro, and Browne 1985), so they are done in a specific order and interpreted with a **decision tree** (Figure 1 in the article):
+    - Start with **Mt − Ms**. This is a test of whether the theoretical model explains the construct covariances as well as the saturated model, which is a test of **nomological validity**. Because it is independent of the measurement model's fit, the researcher can improve the measurement model by respecification and still get a fair test of the theory.
+    - Then compare Mc with Mt and Ms, and Mt with Mu, to decide among the three theoretical alternatives (Mc, Mt, Mu):
+        - If Mc is not significantly worse than Mt or Ms, accept Mc (the most parsimonious).
+        - If Mt is fine but Mc is not, check Mt − Mu: nonsignificant means accept Mt; significant means accept Mu.
+        - If Mt − Ms is significant (theory does not fit), the researcher must respecify Mu (a new alternative, Mu′), and the process becomes more **exploratory**; the authors flag that this shift away from confirmatory work matters.
+- The degrees of freedom for Mt − Ms also show how much **causal inference** is possible: available df = [(m + n)(m + n − 1)]/2. A model with paths between all constructs has zero df and cannot be distinguished from the measurement model, so causal interpretation should be avoided. The more paths set to zero (with acceptable fit), the stronger the qualified causal claims.
+
+## Advantages of the Two-Step Approach
+
+- **Locating the source of poor fit:** measurement and structural fit are separated, so it is clear whether the problem is in how constructs are measured or in the hypothesized relationships.
+- **No masking:** in a one-step approach, good fit in one part can compensate for (and hide) poor fit in another. The two steps prevent this.
+- **Less interpretational confounding:** since measurement is settled first, loadings stay stable when structural models change.
+- **Tests of all loadings and an early check on whether any structural model could fit** (the pseudo chi-square).
+- **Independent test of the theoretical model:** because the measurement model is the baseline for the SCDTs, its respecification does not compromise the theory test.
+- **Meaningful comparison of alternatives:** the nested framework lets researchers compare their theory to the next most likely constrained and unconstrained alternatives, which follows the advice to test rival hypotheses in the same study.
+- **Highlights the trade-off between fit and causal inference:** adding paths improves fit but weakens causal claims, and paths hypothesized as absent and supported by SCDTs also carry theoretical information.
+
+## Additional Considerations in Structural Model Interpretation
+
+- **Practical versus statistical significance:**
+    - Chi-square depends on sample size, so large samples can produce significant results for trivial differences.
+    - The **normed fit index (Δ)** helps by showing the percentage of covariation explained relative to a null model. It can be computed alongside each SCDT (e.g., Δts shows the practical loss from constraining paths in the theoretical model).
+    - Researchers may accept a more parsimonious model if the practical loss is tiny, even when the SCDT is statistically significant.
+- **Cautions about causal inference:**
+    1. Models are never *confirmed*; they only gain support by failing to be disconfirmed, and other models with equal fit may exist.
+    2. Temporal order is not a guarantee of causation (Cliff's example: a father's occupation precedes a child's intelligence-test performance and they correlate, but that does not mean it causes it).
+    3. The **nominalistic fallacy:** naming a construct does not mean it is understood; there is always a gap between an indicator and its construct because of invalidity and unreliability.
+    4. Respecification reduces the ability to infer causation.
+- Ideally, a sample would be split, developing the model on one half and validating on the other. However, the large samples full-information methods require usually make this impossible, so in most cases only **qualified** causal statements are justified.
+- On specification searches, the authors cite MacCallum's warning that researchers "should not interpret a nonsignificant chi-square as a signal to stop a specification search" (MacCallum 1986, 118, as quoted in Anderson and Gerbing 1988, 419). This reinforces testing alternative models even when the first one seems to fit.
+
+# Conclusion
+
+- The article's main contribution is a comprehensive two-step modeling approach, combined with guidance on specifying, assessing, and respecifying measurement models.
+- Strengths of the two-step approach listed by the authors:
+    1. It allows significance tests of all loadings.
+    2. It shows whether any structural model could fit acceptably.
+    3. It gives an asymptotically independent test of the substantive model.
+    4. Because the measurement model is the baseline, respecification to reach unidimensional measurement is possible without harming the structural test.
+    5. It gives a strong framework for comparing the theory with the next most likely alternatives.
+- The authors conclude that SEM has great potential for theory development and construct validation, especially when researchers use the two-step approach and stay aware of the basic principles of scientific inference (Anderson and Gerbing 1988, 422).
+
+# References
+
+Anderson, James C., and David W. Gerbing. 1988. “Structural Equation Modeling in Practice: A Review and Recommended Two-Step Approach.” *Psychological Bulletin* 103 (3): 411–423. https://doi.org/10.1037/0033-2909.103.3.411.
+
+MacCallum, Robert. 1986. “Specification Searches in Covariance Structure Modeling.” *Psychological Bulletin* 100 (1): 107–120.
+
+Steiger, James H., Alexander Shapiro, and Michael W. Browne. 1985. “On the Multivariate Asymptotic Distribution of Sequential Chi-Square Statistics.” *Psychometrika* 50 (3): 253–264.
+
+# Appendix
+
+- [GitHub Repository](https://github.com/TODO-your-username/TODO-your-repository)
+- [Published Article Notes on GitHub Pages](https://TODO-your-username.github.io/TODO-your-repository/)
