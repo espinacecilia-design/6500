@@ -10,7 +10,7 @@ format:
 
 ## 1. Overview
 
-I joined YouGov on [GAP: date] and received 500 starter points on sign-up.
+I joined YouGov on Oct. 2nd and received 500 starter points on sign-up.
 
 ![YouGov sign-up confirmation](images/yougov-signup.png)
 
@@ -18,7 +18,7 @@ My first survey was a profile survey titled "Welcome to YouGov" (topic: About yo
 
 ![YouGov welcome survey invitation](images/yougov-welcome.png)
 
-[GAP: 1-2 sentences on how many surveys you were invited to or completed after this one.]
+I completed 3 surveys. 
 
 ## 2. Questions I Found Weird or Confusing
 
@@ -88,9 +88,9 @@ My first survey was a profile survey titled "Welcome to YouGov" (topic: About yo
 5. **Explain why you are asking.** Questions that seem unrelated or repeated (Questions 3 and 4) feel odd without context. A short note such as "we ask this to verify our records" would help.
 6. **Define time frames and formats.** "In the last year" and an unformatted birth-year box leave room for different interpretations.
 7. **Be transparent upfront.** YouGov showed the topic, length, and reward before I started, which I plan to do in my own survey.
-8. [GAP: one lesson tied to your own research project topic.]
+8. **Apply these lessons to my CEP survey.** For my Capstone Experience Project, I am designing a survey on customer attitudes toward a digital loyalty program for the farm store, including intention to use it, demographics, and store usage behavior. This experience showed me how to make that survey easier for respondents to complete. I will keep answer choices clearly distinct and avoid "All of the above" in check-all lists. I will define time frames, such as "in the past 3 months," when asking about store visits. I will ask about one idea per question, for example separating "ease of use" from "reward value." I will also include a short note explaining why sensitive questions such as demographics are asked, and offer "Prefer not to say." Finally, I will proofread the survey and pilot-test it with a few people before launch, because even a polished panel like YouGov had confusing and inconsistent questions.
 
 ## Appendix
 
-- GitHub repo: [GAP: link]
-- GitHub Pages: [GAP: link]
+- GitHub repo: https://github.com/espinacecilia-design/6500
+- GitHub Pages: https://espinacecilia-design.github.io/6500/W06survey/consumer-panel-report.html
