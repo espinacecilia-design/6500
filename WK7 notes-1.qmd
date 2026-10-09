@@ -1,0 +1,77 @@
+---
+title: "Week 7 in class notes"
+author: "Cecilia Espina"
+date: today
+format:
+  html:
+    toc: true
+    number-sections: true
+    embed-resources: true
+---
+
+#### **Fall IBM 6500**
+
+[Syllabus overview]{.underline}
+
+SEM Big Query
+
+**W4:** CEP quick off
+
+**W6** CH6
+
+**W9** 1st presentation Ch 1.,2,3
+
+**W12** data analysis Ch5 reconciliation
+
+**W15** 2nd presentation ch 1,2,3
+
+- Deadline expectations, a couple of days to be behind is okay but should not be a lot of assignments behind
+- listen to assignment while driving, as an audio
+
+[Class notes]{.underline}
+
+- only use AI to make the notes visually better
+- will show how well we know how to use quarto
+- W9 less CEP assignments, CEP lead will have hands off
+- W10 should start data collection
+- W13 should be wrapping up data collection
+
+[Github publication]{.underline}
+
+- 1st way: type into terminal
+
+- 2nd way: it'll help preserve file name
+
+  - can do through positron \> preview \> source control /github repo settings
+
+[Chapter 2 overview]{.underline}?
+
+- research question, hypothesis format for chapter 2
+
+- AO\_ \> RQ_1 \> RQ_2
+
+Discussion on whether some groups needs an actual survey for their own CEP project.
+
+If you do not have secondary data, rely on primary data for CEP project.
+
+[C&M table presentation from one group]{.underline}
+
+-overview on hypothesis
+
+-the data the need to measure and how
+
+-submitted feedback on CANVAS discussion board
+
+[Last 20 minutes of class]{.underline}
+
+- work on questionnaire, C&M table is suppose to help you organize your thoughts for your questions
+
+- going between questionnaire to C&M table
+
+- going over COVID coffee shop project, went through google doc
+
+  - develop logic to support hypothesis
+
+  - present hypothesis
+
+  - copy hypothesis to C&M table
