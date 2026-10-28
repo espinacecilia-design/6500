@@ -1,0 +1,230 @@
+---
+title: "What Makes Customers Say Yes to a Digital Loyalty Program?"
+subtitle: "Survey analytics for a university farm store | AO4: Digital loyalty program adoption"
+author: "Cecilia Espina"
+date: today
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    transition: fade
+    footer: "Cecilia Espina | Marketing Analytics Portfolio"
+    incremental: false
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+## The business problem
+
+A university farm store is growing, but its data is not.
+
+- Loyalty is a **paper punch card**: no data on who comes back or why.
+- Promotions are **not measured**, so the store can't tell what brings customers back.
+- Large grocers already offer **apps and digital rewards**.
+- Customer attitudes toward a digital program are **unknown**.
+
+::: {.callout-note}
+**Question for the business:** Would customers actually use a digital loyalty program, and what would make them more willing?
+:::
+
+## Why it matters
+
+The online channel is where growth is.
+
+- Online grocery is forecast to grow about **9% a year through 2029**, vs. under 2% for in-store grocery (The Packer 2025).
+- A digital program is the clearest gap versus competitors.
+- It would replace the punch card with **consented purchase histories** the store can analyze.
+
+**So what:** differentiation and convenience matter, so loyalty is one piece of a connected online system (discovery, conversion, assortment, loyalty).
+
+## Who this is for
+
+**Primary audience:** the store's manager and director (the people deciding whether to launch and how to message a digital program).
+
+| Segment | Profile | How to reach |
+|---|---|---|
+| Students | 18-24, price-conscious, mobile-first | App, campus social |
+| Faculty and staff | 25-64, value quality and convenience | Campus email |
+| Community and nursery shoppers | Local residents, many 35+ | Search, events |
+| Gift buyers | Alumni, offices, local businesses | Email, online ordering |
+
+*Preliminary segments; the survey will confirm them.*
+
+## What past research says
+
+- **Usefulness, ease of use, and trust** predict whether customers adopt loyalty programs and apps (Donnelly et al. 2015; Ieva and Ziliani 2017; Lin et al. 2019; Löffler and Bodendorf 2010; Su et al. 2022).
+- Preferences **differ by customer** (Ieva and Ziliani 2017; Rahadian et al. 2026).
+- Little work covers **small university stores**.
+
+**Method direction:** a survey, with regression of intention on usefulness, ease, and trust, plus intention by visit frequency as a preview of RFM segments.
+
+## Research question and hypothesis
+
+**RQ4:** What drives customers' intention to use a digital loyalty program at the store?
+
+**H4:** Perceived usefulness, ease of use, and trust in data handling are each positively associated with intention to use.
+
+```{mermaid}
+flowchart LR
+  A[Usefulness] --> D((Intention to use))
+  B[Ease of use] --> D
+  C[Trust in data handling] --> D
+```
+
+## Data and sampling
+
+**Source:** primary data, an online survey built in Qualtrics.
+
+- **Population:** customers 18 or older who bought something in the past 12 months
+- **Sampling:** non-probability convenience sample
+- **Target:** n = 200
+- **Recruitment:** in-store flyer with QR code, plus email
+- **Incentive:** an extra punch on the customer's loyalty card
+- **Fielding window:** **[CONFIRM DATES; planned Oct 26 to Nov 20, 2026, pending IRB approval]**
+
+## Measures
+
+| Construct | Role | Items | Scale |
+|---|---|---|---|
+| Perceived usefulness | Independent | 3-4 | 5-point agreement |
+| Perceived ease of use | Independent | 3 | 5-point agreement |
+| Trust in data handling | Independent | 3-4 (one reverse-coded) | 5-point agreement |
+| **Intention to use** | **Dependent** | 3 | 5-point agreement |
+| Attitude toward the program | Exploratory | 3 | 5-point agreement |
+| Visit frequency, recency, spend, channel, other programs, respondent type, age, gender | Controls | Single items | Ordinal and nominal |
+
+## Data preparation
+
+Workflow in R (tidyverse) inside Quarto:
+
+1. **Import** the Qualtrics export
+2. **Tidy:** clean names, drop incomplete responses, recode, **reverse-code** the trust item
+3. **Transform:** build composite scores (mean of items per construct)
+4. **Visualize and model**
+
+```{r}
+#| eval: false
+library(tidyverse)
+library(psych)
+
+survey <- read_csv("data/survey_clean.csv")   # [REPLACE with your export]
+
+survey <- survey |>
+  mutate(
+    trust_3 = 6 - trust_3,                       # reverse-code (5-point scale)
+    pu      = rowMeans(across(starts_with("pu_"))),
+    peou    = rowMeans(across(starts_with("peou_"))),
+    trust   = rowMeans(across(starts_with("trust_"))),
+    intent  = rowMeans(across(starts_with("intent_"))),
+    attitude = rowMeans(across(starts_with("att_")))
+  )
+```
+
+## Analysis plan
+
+1. Reliability and descriptives
+2. Multiple linear regression for H4
+3. Exploratory attitude model
+4. Compare segments on the RFM preview (ANOVA)
+5. Themes from open-ended answers
+6. Structural equation model as an alternative
+
+**Why:** composite scores turn Likert items into interval-like measures.
+
+## Results: who responded
+
+::: {.callout-warning}
+**[PLACEHOLDER: fill after the survey closes.]** Do not publish numbers until the data is final.
+:::
+
+- Final sample: **n = [___]** (target was 200)
+- Respondent type: **[__% student, __% faculty/staff, __% community, __% other]**
+- Age and gender: **[___]**
+
+```{r}
+#| eval: false
+survey |> count(respondent_type) |> mutate(pct = round(n / sum(n) * 100, 1))
+```
+
+## Results: reliability and descriptives
+
+```{r}
+#| eval: false
+alpha(select(survey, starts_with("pu_")))$total$raw_alpha
+alpha(select(survey, starts_with("peou_")))$total$raw_alpha
+alpha(select(survey, starts_with("trust_")))$total$raw_alpha
+alpha(select(survey, starts_with("intent_")))$total$raw_alpha
+
+survey |>
+  summarise(across(c(pu, peou, trust, intent),
+                   list(mean = mean, sd = sd), .names = "{.col}_{.fn}"))
+```
+
+**[INSERT: table of Cronbach's alpha, mean, and SD per construct.]**
+
+## Results: what drives intention (H4)
+
+```{r}
+#| eval: false
+m1 <- lm(intent ~ pu + peou + trust + visit_freq + respondent_type + age,
+         data = survey)
+summary(m1)
+```
+
+**[INSERT: coefficient plot or table.]**
+
+- Which predictors are significant? **[___]**
+- Which is strongest? **[___]**
+- Is H4 supported? **[fully / partly / not supported]**
+
+## Results: segments (RFM preview)
+
+```{r}
+#| eval: false
+ggplot(survey, aes(x = visit_freq, y = intent)) +
+  stat_summary(fun = mean, geom = "col", fill = "#1f3d33") +
+  labs(x = "Visit frequency", y = "Mean intention to use")
+
+summary(aov(intent ~ visit_freq, data = survey))
+```
+
+**[INSERT: chart, and what it says about who is most likely to adopt.]**
+
+## Insights and recommendations
+
+**[REPLACE these with your actual findings. Draft structure:]**
+
+1. **Insight:** [strongest driver of intention] → **Action:** [build the program around it]
+2. **Insight:** [role of trust] → **Action:** [clear, simple privacy message at sign-up]
+3. **Insight:** [which segment is most willing] → **Action:** [launch to that segment first]
+
+## Limitations
+
+- **Non-probability sample:** results may not generalize to all customers.
+- **Stated intention, not enrollment:** true RFM needs post-launch purchase data.
+- Survey shows **association, not cause**.
+- Timeline depended on IRB approval; a late start shortens the response window.
+
+## Next steps
+
+- Launch the program with a small pilot and track real enrollment.
+- Replace the RFM preview with true RFM once purchase data exists.
+- Re-survey after launch to compare intention vs. actual use.
+
+## Skills shown
+
+R and tidyverse | Survey design (Qualtrics) | Reliability and regression | ANOVA | Quarto and Revealjs | Business recommendations
+
+## References {.smaller}
+
+**[PASTE full formatted references from your proposal deck. Sources used on these slides:]**
+
+- Donnelly et al. (2015), *International Small Business Journal*
+- Ieva and Ziliani (2017), *International Journal of Retail & Distribution Management*
+- Lin et al. (2019), *Patient Preference and Adherence*
+- Löffler and Bodendorf (2010), *Proceedings of the International Conference on Information Management & Evaluation*
+- Rahadian et al. (2026), *Procedia Computer Science*
+- Su et al. (2022), *Journal of Hospitality Marketing & Management*
+- The Packer (2025), online grocery sales forecast
