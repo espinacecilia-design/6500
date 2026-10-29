@@ -197,5 +197,5 @@ ORDER BY event_date;
 
 # Submission Links
 
-- **GitHub Pages:** \[PASTE LINK HERE\]
-- **GitHub Repo:** \[PASTE LINK HERE\]
+- [**GitHub Pages**](GitHub Pages: https://espinacecilia-design.github.io/6500/BIGSQL/lecture1-ga4.htmlGitHub Repo: https://github.com/espinacecilia-design/6500/tree/main/BIGSQL)
+- [**GitHub Repo**](GitHub Pages: https://espinacecilia-design.github.io/6500/BIGSQL/lecture1-ga4.htmlGitHub Repo: https://github.com/espinacecilia-design/6500/tree/main/BIGSQL)
