@@ -1,0 +1,567 @@
+---
+title: "IC10-2-1: Data Preparation with Case 31"
+subtitle: "Employees Federal Credit Union (EFCU) Member Survey"
+author: "Cecilia Espina"   # <-- EDIT if you want a different name
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-expand: true
+    number-sections: true
+    embed-resources: true
+    theme: cosmo
+execute:
+  echo: fenced
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(haven)
+library(labelled)
+library(janitor)
+library(sjPlot)
+library(psych)
+library(skimr)
+library(gt)
+
+set_theme(theme_minimal())
+theme_set(theme_minimal())
+```
+
+# Purpose
+
+The Employees Federal Credit Union (EFCU) mailed a 40-question member survey (Case Exhibit 31.1) to find out why members are not borrowing from the credit union. This report prepares the raw SPSS data for analysis. Following the questionnaire and the coding scheme in Case Exhibit 31.2, I **import** the data, **audit** its labels, **repair** the metadata, **recode** special responses, **reverse-code** items where a reversal makes sense, **evaluate** two candidate multi-item measures, and **save** a cleaned SPSS file.
+
+# Import and inspect the raw data
+
+```{r}
+#| label: import
+
+data_raw <- read_sav("Case 31 Data_efcu_1.sav")   # keep data_raw untouched as a reference copy
+```
+
+## Structure of the data
+
+```{r}
+#| label: inspect
+
+dim(data_raw)
+names(data_raw)
+glimpse(data_raw)
+```
+
+```{r}
+#| label: missing-raw
+
+# Count missing values per variable (only variables with at least one NA)
+colSums(is.na(data_raw))[colSums(is.na(data_raw)) > 0]
+```
+
+```{r}
+#| label: precomputed-check
+
+# Are the two un-numbered variables the same thing? Are they the mean of q3-q6?
+all(data_raw$OverallEmployeePerformace == data_raw$employeeperformance)
+isTRUE(all.equal(
+  as.numeric(data_raw$OverallEmployeePerformace),
+  as.numeric(rowMeans(data_raw[c("q3", "q4", "q5", "q6")]))
+))
+```
+
+### Answers {.unnumbered}
+
+1. **Rows and columns.** The file has **`r nrow(data_raw)` rows** (respondents) and **`r ncol(data_raw)` columns** (variables).
+2. **Variable names.** `q3`–`q27`, `q30`–`q34`, `q37`, `q38`, plus `OverallEmployeePerformace` and `employeeperformance` (the full list is printed above). The names `qN` match the question numbers on the questionnaire. Questions 1, 2, 28, 29, 35, 36, 39 and 40 are not in the file (screening, check-all-that-apply or open-ended questions).
+3. **Items vs. precomputed variables.** The 32 variables named `q` + a number are questionnaire items. `OverallEmployeePerformace` and `employeeperformance` are **precomputed**: they have no question number, no variable label and no value labels, they are identical to each other, and the check above shows they equal the row mean of `q3`–`q6` (the four employee items).
+4. **Variable label vs. value label.** A *variable label* describes what a whole column measures (for example, `q3` = "Employees are Courteous"). A *value label* attaches text to one numeric code inside the column (for example, `1` = "Strongly Disagree").
+5. **Missing values.** Only `q7` (10), `q8` (21) and `q37` (7) contain `NA`. Each of these three questions has "No Opinion" coded as 6. No 6s appear in the imported data, which is consistent with 6 being declared a user-missing code in SPSS and `read_sav()` converting it to `NA` by default.
+
+# Data dictionary
+
+```{r}
+#| label: dictionary
+
+dict_raw <- tibble(
+  variable     = names(data_raw),
+  label        = map_chr(data_raw, \(x) var_label(x) %||% NA_character_),
+  class        = map_chr(data_raw, \(x) class(x)[1]),
+  n_distinct   = map_int(data_raw, n_distinct),
+  value_labels = map_chr(data_raw, \(x) {
+    v <- val_labels(x)
+    if (is.null(v)) NA_character_ else paste0(v, " = ", names(v), collapse = "; ")
+  })
+)
+
+dict_raw |>
+  gt() |>
+  tab_header(title = "Data dictionary of the raw file") |>
+  sub_missing(missing_text = "—") |>
+  tab_options(table.font.size = px(12))
+```
+
+### Answers {.unnumbered}
+
+1. **Clear, useful labels.** The employee items (`q3`–`q6`), the service-awareness items (`q13`–`q26`, labelled with the service name), `q7` (savings rates), `q10` (statement accuracy), `q27` (currently have loan) and `q31`–`q34` are clear enough to read without the questionnaire.
+2. **Labels to revise.** `q8` is labelled "statement frequency", which duplicates `q9`; question 8 actually asks about the **rates the credit union charges for borrowing**. Other labels are terse or inconsistent in capitalization and could be expanded for a report: `q30` ("CU rates lower" → loan rates lower than other institutions), `q37` ("overall rating" → overall rating of how the CU is managed and operated), `q38` ("headquarter" → lives in headquarters area) and `q12` (capitalized unlike its neighbors).
+3. **Measurement levels** (Scales of Measurement slides):
+   - **Nominal:** `q11`, `q12`, `q27`, `q38` (yes/no). The numbers are only tags, so only counts and percentages make sense. `q13`–`q26` are also best treated as nominal categories (aware and used / aware but not used / unaware), even though they have a loose order.
+   - **Ordinal:** `q7`, `q8` and `q37` (Very high … Very low, Excellent … Very poor) and `q10` (Excellent … Poor) have a clear order but unknown distances between categories. `q9` is ordinal too, but its best answer ("About right") is in the middle, so it is not a "more is better" scale.
+   - **Approximately interval:** the 5-point agreement items `q3`–`q6` and `q30`–`q34` (Strongly disagree → Strongly agree). Strictly they are ordinal, but they are treated as interval when averaged into a multi-item scale, which assumes the steps between points are roughly equal. None of the variables is ratio (there is no true zero).
+4. **Value labels.** Essential: `q9` (the order of the codes is not obvious), the yes/no items (`1 = Yes`, `2 = No` is the reverse of the usual 1 = yes / 0 = no), `q13`–`q26` (1 = aware and used, 3 = unaware) and the "No Opinion" code 6. Predictable from the response scale: the end points of the agreement items (1 = Strongly disagree, 5 = Strongly agree), although the middle codes are still unlabeled.
+
+## A short labeling demonstration
+
+This chunk shows how the `labelled` package reads and changes labels. It works on a temporary copy, so nothing is saved.
+
+```{r}
+#| label: label-demo
+
+demo <- data_raw$q7
+
+var_label(demo)                                     # variable label
+val_labels(demo)                                    # value labels
+
+demo <- demo |> add_value_labels("Refused" = 7)     # add a temporary value label
+val_labels(demo)
+
+demo <- demo |> remove_var_label()                  # remove the variable label
+var_label(demo)
+val_labels(demo)                                    # value labels are untouched
+```
+
+# Improve the metadata
+
+## Codes in the data that have no value label
+
+```{r}
+#| label: unlabelled-codes
+
+unlabelled_codes <- data_raw |>
+  select(matches("^q\\d+$")) |>
+  imap_dfr(\(x, nm) {
+    observed <- sort(unique(na.omit(as.numeric(x))))
+    labelled_codes <- as.numeric(val_labels(x))
+    tibble(variable = nm,
+           unlabelled_codes_in_data = paste(setdiff(observed, labelled_codes), collapse = ", "))
+  }) |>
+  filter(unlabelled_codes_in_data != "")
+
+unlabelled_codes |> gt() |> tab_header(title = "Codes present in the data but missing a value label")
+```
+
+**Answer.** Codes that appear in the data but have no label:
+
+- the middle points of the agreement scale (2, 3 and 4, wherever they occur) for `q3`–`q6` and `q30`–`q34`, because only 1 and 5 are labelled;
+- code `3` for `q12` ("No answer") and for `q13`–`q25` ("Unaware").
+
+Exhibit 31.2 also defines "No answer" = 3 for the other yes/no items (`q11`, `q27`, `q38`); nobody used it there, but the label belongs in the metadata. Finally, code 6 on `q37` is labelled "No Opinion" in the file, while Exhibit 31.2 calls it "No answer".
+
+## Repair the labels
+
+```{r}
+#| label: repair-labels
+
+# helper: apply one set of value labels to several variables
+lab_list <- function(vars, labs) setNames(rep(list(labs), length(vars)), vars)
+
+likert5 <- c("Strongly Disagree" = 1, "Disagree" = 2, "Uncertain" = 3,
+             "Agree" = 4, "Strongly Agree" = 5)
+
+data_lab <- data_raw |>
+  # 1. Five-point agreement scale (q3-q6, q30-q34)
+  set_value_labels(.labels = lab_list(c(paste0("q", 3:6), paste0("q", 30:34)), likert5)) |>
+  # 2. "Unaware" = 3 for the awareness items q13-q26
+  add_value_labels(!!!lab_list(paste0("q", 13:26), c("Unaware" = 3))) |>
+  # 3. "No answer" = 3 for the yes/no items
+  add_value_labels(!!!lab_list(c("q11", "q12", "q27", "q38"), c("No answer" = 3))) |>
+  # 4. q37 overall rating
+  set_value_labels(q37 = c("Excellent" = 1, "Good" = 2, "Average" = 3,
+                           "Poor" = 4, "Very Poor" = 5, "No answer" = 6)) |>
+  # 5. q8 asks about the rates charged for borrowing, not statement frequency
+  set_variable_labels(q8 = "Rates the credit union charges members to borrow funds")
+
+# Which variables use the "unaware" and "no answer" codes?
+data_lab |>
+  select(all_of(c(paste0("q", 13:26), "q11", "q12", "q27", "q38"))) |>
+  summarise(across(everything(), \(x) sum(x == 3, na.rm = TRUE))) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "n_code_3") |>
+  filter(n_code_3 > 0)
+
+var_label(data_lab$q8)
+val_labels(data_lab$q3)
+val_labels(data_lab$q37)
+```
+
+**Answer (relabeling `q8`).** `set_variable_labels(q8 = "Rates the credit union charges members to borrow funds")`. Question 8 on the questionnaire asks "What is your opinion about the rates the Credit Union is charging its members to borrow funds?", so the new label separates it from `q9`, which really is about statement frequency. Note: Exhibit 31.2 calls code 6 on `q37` "no answer" (the questionnaire prints "No opinion"); I used "No answer" to match the coding scheme.
+
+# Create an analysis copy
+
+The two precomputed variables are removed so that every measure used later is built (and tested) from the original items.
+
+```{r}
+#| label: analysis-copy
+
+data_analysis <- data_lab |>
+  select(matches("^q\\d+$"))
+
+names(data_analysis)
+setdiff(names(data_lab), names(data_analysis))   # what was dropped
+```
+
+**Why not keep the computed indexes?** The purpose of this assignment is to *evaluate and construct* measures. A precomputed index (a) hides how it was built, so I cannot check which items went in, how missing values were handled or whether any item needed reversing; (b) skips the reliability and factor checks that justify combining items; and (c) would duplicate `q3`–`q6` if analyzed alongside them (perfect collinearity). Here both variables are just the mean of `q3`–`q6`, so I rebuild an index from the items after testing them.
+
+## Check the observed values against the questionnaire
+
+```{r}
+#| label: dq-values
+
+quality_check <- data_analysis |>
+  imap_dfr(\(x, nm) {
+    observed <- sort(unique(na.omit(as.numeric(x))))
+    defined  <- as.numeric(val_labels(x))
+    tibble(
+      variable        = nm,
+      observed_values = paste(observed, collapse = ", "),
+      n_missing       = sum(is.na(x)),
+      pct_missing     = round(100 * mean(is.na(x)), 1),
+      undefined_codes = paste(setdiff(observed, defined), collapse = ", ")
+    )
+  })
+
+quality_check |>
+  gt() |>
+  tab_header(title = "Observed values and missing data, by variable") |>
+  sub_missing(missing_text = "—") |>
+  tab_options(table.font.size = px(12))
+
+quality_check |> filter(undefined_codes != "")
+```
+
+**Answer.** After the labels are repaired, **no variable contains a code that the questionnaire does not define** (the last table has zero rows). Two things to note: `q9` only uses codes 3 and 4, and `q26` only uses 1 and 2; these are legitimate but narrow ranges, not errors.
+
+# Recode special responses and reverse-code
+
+## "No Opinion" as missing
+
+```{r}
+#| label: no-opinion
+
+# Condition: are there any 6s left?
+data_analysis |>
+  summarise(across(c(q7, q8, q37), \(x) sum(x == 6, na.rm = TRUE)))
+
+# Convert 6 to NA (harmless here because the file already treats 6 as missing,
+# but this makes the rule explicit and reproducible)
+data_analysis <- data_analysis |>
+  mutate(across(c(q7, q8, q37), \(x) na_if(x, 6)))
+
+data_analysis |>
+  summarise(across(c(q7, q8, q37), \(x) sum(is.na(x))))
+```
+
+## Reverse-code rating items
+
+`q7`, `q8` and `q37` run from 1 = highest to 5 = lowest, and `q10` from 1 = Excellent to 4 = Poor. Reversing makes **larger numbers mean "more"** of the thing rated. The formula is (highest code + 1) − value: `6 − x` for a 5-point item and `5 − x` for a 4-point item.
+
+```{r}
+#| label: reverse-code
+
+data_analysis <- data_analysis |>
+  mutate(
+    q7r  = 6 - q7,
+    q8r  = 6 - q8,
+    q10r = 5 - q10,
+    q37r = 6 - q37
+  ) |>
+  set_variable_labels(
+    q7r  = "Savings rates paid (reversed: 1 = Very Low ... 5 = Very High)",
+    q8r  = "Rates charged to borrow (reversed: 1 = Very Low ... 5 = Very High)",
+    q10r = "Statement accuracy (reversed: 1 = Poor ... 4 = Excellent)",
+    q37r = "Overall rating of CU management (reversed: 1 = Very Poor ... 5 = Excellent)"
+  ) |>
+  set_value_labels(
+    q7r  = c("Very Low" = 1, "Low" = 2, "Average" = 3, "High" = 4, "Very High" = 5),
+    q8r  = c("Very Low" = 1, "Low" = 2, "Average" = 3, "High" = 4, "Very High" = 5),
+    q10r = c("Poor" = 1, "Fair" = 2, "Good" = 3, "Excellent" = 4),
+    q37r = c("Very Poor" = 1, "Poor" = 2, "Average" = 3, "Good" = 4, "Excellent" = 5)
+  )
+```
+
+### Variables that should *not* be reversed
+
+**`q9` (statement frequency).** The scale is 1 = Too often, 2 = Very often, 3 = About right, 4 = Not often enough, 5 = Never. The best answer is in the middle, so the scale is not "more is better" and reversing it would produce a meaningless direction. To answer "was the frequency about right?", create a binary variable instead:
+
+```{r}
+#| label: q9-about-right
+
+data_analysis <- data_analysis |>
+  mutate(q9_about_right = if_else(q9 == 3, 1, 0)) |>
+  set_variable_labels(q9_about_right = "Statement frequency is about right (1 = yes, 0 = no)") |>
+  set_value_labels(q9_about_right = c("Not about right" = 0, "About right" = 1))
+
+data_analysis |> count(q9, q9_about_right) |> mutate(q9 = as.numeric(q9))
+```
+
+**`q13`–`q26` (service awareness).** The codes are categories of a *status* (aware and used / aware but not used / unaware), and each item is a different service. Averaging them into one score would mix unlike services and treat the gap between codes as equal. A better summary is a frequency table for each service, plus counts of how many services each member knows about and uses:
+
+```{r}
+#| label: awareness-summary
+
+awareness_vars <- paste0("q", 13:26)
+
+awareness_summary <- data_lab |>
+  select(all_of(awareness_vars)) |>
+  pivot_longer(everything(), names_to = "variable", values_to = "code") |>
+  mutate(status = case_match(as.numeric(code),
+                             1 ~ "Aware and used",
+                             2 ~ "Aware, not used",
+                             3 ~ "Unaware")) |>
+  count(variable, status) |>
+  group_by(variable) |>
+  mutate(pct = round(100 * n / sum(n), 1)) |>
+  ungroup() |>
+  select(-n) |>
+  pivot_wider(names_from = status, values_from = pct, values_fill = 0) |>
+  mutate(variable = factor(variable, levels = awareness_vars)) |>
+  arrange(variable)
+
+awareness_summary |> gt() |> tab_header(title = "Awareness of services (% of respondents)")
+
+# per-respondent counts
+data_analysis <- data_analysis |>
+  mutate(
+    n_services_aware = rowSums(across(all_of(awareness_vars), \(x) as.numeric(x) %in% c(1, 2))),
+    n_services_used  = rowSums(across(all_of(awareness_vars), \(x) as.numeric(x) == 1))
+  ) |>
+  set_variable_labels(
+    n_services_aware = "Number of the 14 services the member is aware of (q13-q26)",
+    n_services_used  = "Number of the 14 services the member has used (q13-q26)"
+  )
+
+summary(data_analysis[c("n_services_aware", "n_services_used")])
+```
+
+### Awareness items as an ordinal scale (task)
+
+If the awareness questions are treated as an ordinal scale of **engagement** (unaware < aware but not used < aware and used), reverse-coding gives larger numbers = more engagement. The transformation is `4 − x`:
+
+```{r}
+#| label: awareness-reverse
+
+data_analysis <- data_analysis |>
+  mutate(across(all_of(awareness_vars), \(x) 4 - x, .names = "{.col}r")) |>
+  set_value_labels(.labels = lab_list(paste0(awareness_vars, "r"),
+                                      c("Unaware" = 1, "Aware, not used" = 2, "Aware and used" = 3)))
+
+# Add readable variable labels (e.g. "Regular share account (engagement, reversed)")
+for (v in awareness_vars) {
+  var_label(data_analysis[[paste0(v, "r")]]) <- paste0(var_label(data_lab[[v]]), " (engagement: 1 = Unaware ... 3 = Aware and used)")
+}
+
+data_analysis |> count(q13, q13r) |> mutate(across(1:2, as.numeric))
+```
+
+This coding is only defensible as a *3-level engagement* ordering; I would still **summarize these items with the frequency table above**, not with a mean, because the distance from "unaware" to "aware" is not the same as from "aware" to "used", and the services are different products.
+
+## Verify the recodes
+
+```{r}
+#| label: verify-recodes
+
+pairs <- tribble(
+  ~original, ~reversed, ~k,
+  "q7",  "q7r",  6,
+  "q8",  "q8r",  6,
+  "q10", "q10r", 5,
+  "q37", "q37r", 6
+)
+
+checks <- pmap_dfr(pairs, \(original, reversed, k) {
+  o <- as.numeric(data_analysis[[original]])
+  r <- as.numeric(data_analysis[[reversed]])
+  vl <- val_labels(data_analysis[[reversed]])
+  tibble(
+    original = original,
+    reversed = reversed,
+    `1. no "No Opinion" (6) left`          = !any(o == 6, na.rm = TRUE),
+    `2. lowest <-> highest swapped`        = all(o + r == k, na.rm = TRUE),
+    `3. missing values stay missing`       = identical(is.na(o), is.na(r)),
+    `4. label of highest reversed value`   = names(vl)[which.max(vl)]
+  )
+})
+
+checks |> gt() |> tab_header(title = "Verification of reverse-coded variables")
+```
+
+```{r}
+#| label: crosstabs
+
+xtab <- function(d, a, b) {
+  d |> select(all_of(c(a, b))) |>
+    mutate(across(everything(), as.numeric)) |>
+    count(pick(everything()))
+}
+
+xtab(data_analysis, "q7",  "q7r")
+xtab(data_analysis, "q8",  "q8r")
+xtab(data_analysis, "q10", "q10r")
+xtab(data_analysis, "q37", "q37r")
+```
+
+**Answer.** All four conditions hold: no "No Opinion" codes remain, the lowest original value is now the highest reversed value (and vice versa), `NA`s stay `NA`, and the highest reversed value carries the "more" label. One caveat on **"more favorable"**: for `q7r` (savings rates), `q10r` and `q37r`, a larger number is also more favorable to the member. For `q8r` it is not. A high *loan* rate is good for the credit union but bad for a borrower, so `q8r` should be read as "how high the member thinks rates are", not "how satisfied the member is".
+
+# Evaluate candidate multi-item measures
+
+Two sets of agreement items could form scales: **employee proficiency** (`q3`–`q6`: courteous, helpful, professional, available) and **operational effectiveness** (`q30`–`q34`: loan rates, confidentiality, promptness, meeting needs, simple applications). The labels are removed from a temporary copy only because `psych` functions do not need them.
+
+```{r}
+#| label: scale-helper
+
+evaluate_scale <- function(items) {
+  s <- data_analysis |>
+    select(all_of(items)) |>
+    remove_val_labels() |>
+    remove_var_label()
+  list(
+    alpha = psych::alpha(s, check.keys = FALSE),
+    fa    = psych::fa(s, nfactors = 1, rotate = "none", fm = "minres"),
+    cor   = round(cor(s, use = "pairwise.complete.obs"), 2)
+  )
+}
+
+show_scale <- function(res) {
+  item_tbl <- res$alpha$item.stats |>
+    rownames_to_column("item") |>
+    select(item, mean, sd, r.drop) |>
+    left_join(
+      res$alpha$alpha.drop |> rownames_to_column("item") |> select(item, alpha_if_dropped = raw_alpha),
+      by = "item"
+    ) |>
+    mutate(factor_loading = as.numeric(res$fa$loadings[, 1]),
+           across(where(is.numeric), \(x) round(x, 2)))
+  list(
+    total = res$alpha$total |> select(raw_alpha, std.alpha, average_r) |> round(2),
+    items = item_tbl
+  )
+}
+```
+
+## Employee proficiency (`q3`–`q6`)
+
+```{r}
+#| label: employee-scale
+
+emp <- evaluate_scale(paste0("q", 3:6))
+emp_out <- show_scale(emp)
+
+emp_out$total |> gt() |> tab_header(title = "Reliability: employee proficiency")
+emp_out$items |> gt() |> tab_header(title = "Item statistics: employee proficiency")
+emp$cor
+round(emp$fa$Vaccounted, 2)
+```
+
+1. **Reliability.** `raw_alpha` = **`r round(emp$alpha$total$raw_alpha, 2)`**, above the common .70 benchmark, so the four items are internally consistent.
+2. **Item-total correlations (`r.drop`).** All are positive and strong (`r round(min(emp$alpha$item.stats$r.drop), 2)` to `r round(max(emp$alpha$item.stats$r.drop), 2)`). No item correlates weakly or negatively with the rest, so no item needs reversing and dropping any item would not raise alpha.
+3. **Factor loadings.** All four load between `r round(min(emp$fa$loadings[, 1]), 2)` and `r round(max(emp$fa$loadings[, 1]), 2)` on one factor that explains about `r round(100 * emp$fa$Vaccounted[2, 1])`% of the variance.
+4. **One-factor interpretation.** Reasonable: all four describe how credit union staff treat members (courteous, helpful, professional, available), so one "employee proficiency" construct makes substantive sense.
+5. **Recommendation: create the index.** Both the statistics (alpha, r.drop, loadings) and the meaning of the items support averaging them.
+
+## Operational effectiveness (`q30`–`q34`)
+
+```{r}
+#| label: operations-scale
+
+ops <- evaluate_scale(paste0("q", 30:34))
+ops_out <- show_scale(ops)
+
+ops_out$total |> gt() |> tab_header(title = "Reliability: operational effectiveness")
+ops_out$items |> gt() |> tab_header(title = "Item statistics: operational effectiveness")
+ops$cor
+round(ops$fa$Vaccounted, 2)
+```
+
+1. **Reliability.** `raw_alpha` = **`r round(ops$alpha$total$raw_alpha, 2)`**, well below .70, so the five items are not internally consistent.
+2. **Item-total correlations (`r.drop`).** All are positive (so none looks reverse-worded), but weak: `r round(min(ops$alpha$item.stats$r.drop), 2)` to `r round(max(ops$alpha$item.stats$r.drop), 2)`. Only `q32` (promptness) correlates moderately with the rest, and no single deletion improves alpha much.
+3. **Factor loadings.** Only `q32` loads strongly (about `r round(ops$fa$loadings["q32", 1], 2)`); the others load around .30–.40, and one factor explains only about `r round(100 * ops$fa$Vaccounted[2, 1])`% of the variance.
+4. **One-factor interpretation.** Not reasonable. The items cover different topics (price of loans, confidentiality, speed, meeting needs, application simplicity); the inter-item correlations are mostly below .30, so they do not behave like one construct.
+5. **Recommendation: do not create the index.** The statistics are weak **and** the items measure different aspects of operations, so a single average would blur them.
+
+## Decision for operational effectiveness
+
+No `operational_effectiveness_index` is created. The five items should stay separate and be analyzed one at a time (means and percent agreeing for each, and each compared across groups such as `q38`, headquarters area, with a *t*-test or Mann-Whitney test). This also fits the research objective of finding *which* operating areas members like or dislike, instead of one overall score.
+
+# Create the index that is justified
+
+```{r}
+#| label: indexes
+
+data_clean <- data_analysis |>
+  mutate(
+    employee_proficiency_index = rowMeans(pick(q3:q6), na.rm = TRUE),
+    employee_proficiency_index = if_else(is.nan(employee_proficiency_index),
+                                         NA_real_, employee_proficiency_index)
+  ) |>
+  set_variable_labels(
+    employee_proficiency_index = "Employee proficiency index: mean of q3-q6 (1 = Strongly Disagree ... 5 = Strongly Agree)"
+  )
+
+summary(data_clean$employee_proficiency_index)
+
+# Compare with the precomputed variable from the raw file (should match)
+all.equal(as.numeric(data_clean$employee_proficiency_index),
+          as.numeric(data_raw$employeeperformance))
+```
+
+# Report of data-preparation decisions
+
+::: {.callout-note appearance="simple"}
+## Narrative
+
+**Import.** I read the SPSS file (`Case 31 Data_efcu_1.sav`) into R with `haven::read_sav()` and kept the untouched copy as `data_raw`: `r nrow(data_raw)` respondents and `r ncol(data_raw)` variables.
+
+**Data dictionary.** The file labels most items but is incomplete: only the end points of the agreement scales were labelled, the "No answer" and "Unaware" codes from Exhibit 31.2 were missing, and `q8` carried the label of `q9`. The variables are a mix of nominal (yes/no, awareness), ordinal (rating scales) and approximately interval (agreement) measures.
+
+**Label changes.** I added the five-point agreement labels to `q3`–`q6` and `q30`–`q34`; "Unaware" (3) to `q13`–`q26`; "No answer" (3) to `q11`, `q12`, `q27` and `q38`; the full label set to `q37`; and relabeled `q8` as the rate charged to borrow, as asked by question 8.
+
+**Variables kept or excluded.** I kept the 32 questionnaire items (`^q\d+$`) and excluded `OverallEmployeePerformace` and `employeeperformance`, which are identical precomputed means of `q3`–`q6`, so I could evaluate and build my own index.
+
+**Missing values and "No Opinion".** `q7`, `q8` and `q37` had 10, 21 and 7 missing values (the "No Opinion" = 6 responses). I confirmed no 6s remained and made the rule explicit with `na_if(6)`. Missing values are left as `NA`, not replaced.
+
+**Reverse coding and verification.** I reverse-coded `q7`, `q8`, `q10` and `q37` (`q7r`, `q8r`, `q10r`, `q37r`) so larger numbers mean more of the thing rated, and checked each with cross-tabulations and four logical tests. I did **not** reverse `q9` (its best answer is in the middle; I created a binary "about right" variable instead) or `q13`–`q26` (categories of awareness; summarized by frequency tables, with an optional 3-level engagement coding `q13r`–`q26r`).
+
+**Reliability and factor analysis.** Employee proficiency (`q3`–`q6`) had alpha = `r round(emp$alpha$total$raw_alpha, 2)`, strong item-total correlations and one clear factor. Operational effectiveness (`q30`–`q34`) had alpha = `r round(ops$alpha$total$raw_alpha, 2)`, weak item-total correlations and only one item (`q32`) with a strong loading.
+
+**Indexes.** I created `employee_proficiency_index` (mean of `q3`–`q6`) and did **not** create an operational-effectiveness index; those five items stay separate.
+
+**Limitations.** (1) The sample is small (n = `r nrow(data_raw)`) and the missing values in `q8` (`r round(100 * sum(is.na(data_raw$q8)) / nrow(data_raw))`%) reduce the usable sample for that question. (2) The agreement items are treated as interval, which is an assumption. (3) "Higher" on `q8r` does not mean "more favorable" for a borrower. (4) The awareness reverse coding is an optional ordinal interpretation. (5) Several questions (1, 2, 28, 29, 35, 36, 39, 40) are not in the data file, so objectives about *why* members join or borrow elsewhere cannot be examined here. (6) `q9` and `q26` use only part of their coding range, which limits what can be tested with them.
+:::
+
+# Confirming completeness
+
+```{r}
+#| label: view-df
+
+view_df(data_clean, show.frq = FALSE, show.prc = FALSE)
+```
+
+# Save the cleaned SPSS file
+
+```{r}
+#| label: save-data
+
+# EDIT: replace CE with your initials if they are different
+write_sav(data_clean, "Case31_efcu_cleaned_CE.sav")
+```
+
+The saved file contains the repaired labels, the recoded and reversed variables, the awareness and "about right" variables, and `employee_proficiency_index`.
+
+# Appendix {.unnumbered}
+
+- **GitHub repository:** [https://github.com/espinacecilia-design/YOUR-REPO-NAME](https://github.com/espinacecilia-design/YOUR-REPO-NAME) <!-- REPLACE with your repo URL -->
+- **GitHub Pages (this report):** [https://espinacecilia-design.github.io/YOUR-REPO-NAME/IC10-2-1-Data-Preparation-Case-31.html](https://espinacecilia-design.github.io/YOUR-REPO-NAME/IC10-2-1-Data-Preparation-Case-31.html) <!-- REPLACE with your published URL -->
