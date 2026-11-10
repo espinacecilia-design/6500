@@ -1,0 +1,357 @@
+---
+title: "Summary Tables with gtsummary"
+subtitle: "Revealjs Presentation"
+author: "Cecilia Espina"
+institute: "IBM 6400, Cal Poly Pomona"
+date: "`r Sys.Date()`"
+format:
+  revealjs:
+    theme: serif
+    width: 1600
+    height: 900
+    footer: "M08 Reflection: gtsummary"
+    transition: slide
+    transition-speed: default
+    incremental: false
+    toc: true
+    toc-depth: 1
+    slide-number: true
+    scrollable: true
+    smaller: true
+    code-fold: false
+    code-overflow: wrap
+    number-sections: false
+    embed-resources: true
+    css: styles.css
+editor: visual
+execute:
+  echo: true
+  freeze: auto
+---
+
+```{r}
+#| label: setup
+#| include: false
+library(tidyverse)
+library(gtsummary)
+library(gt)
+# library(readr); cep <- read_csv("YOUR_CEP_FILE.csv")   # load your MSDM CEP data here
+```
+
+# Prompt 1: What can {gtsummary} do? {background-color="#8c2f39"}
+
+## Prompt 1 (type the full prompt here)
+
+::: prompt
+In Step 1, you have seen how to create a summary table and modify it for various statistical analyses. Summarize the package's capabilities as explained by the speaker. How may {gtsummary} benefit you for your school work or career?
+:::
+
+## Why summary tables in code? Motivation
+
+::: incremental
+- Medical research quality is often low, and low-quality code is part of the problem.
+- Reproducibility is often cumbersome and time-consuming.
+- In a Nature survey of 1,576 researchers, 52% saw a significant reproducibility crisis and 38% a slight one.
+- {gtsummary} produces publication-ready tables directly from code, so the table can be regenerated instead of retyped.
+:::
+
+::: notes
+Source: Sjoberg slides (April 2021), Motivation section.
+:::
+
+## Overview of the package
+
+::: incremental
+- Tabular summaries with sensible defaults that are highly customizable.
+- Table types: "Table 1", cross-tabulation, regression models, survival data, survey data, custom tables.
+- Report statistics inline in R Markdown; stack or merge any tables; apply themes; choose a print engine.
+:::
+
+## tbl_summary(): the core function
+
+::::: columns
+::: {.column width="50%"}
+- Four summary types: `continuous`, `continuous2`, `categorical`, `dichotomous`
+- Defaults: median (IQR) for continuous; n (%) for categorical and dichotomous
+- 0/1, TRUE/FALSE and Yes/No variables are treated as dichotomous
+- `NA`s are listed as "Unknown"; variable labels print automatically
+- Key arguments: `by`, `type`, `statistic`, `label`, `digits`
+:::
+
+::: {.column width="50%"}
+```{r}
+trial %>%
+  select(trt, age, grade, response) %>%
+  tbl_summary(by = trt) %>%
+  add_p() %>%
+  add_overall()
+```
+:::
+:::::
+
+## The formula syntax
+
+Pattern: `variable ~ instruction`
+
+::: incremental
+- Select variables by name, `c(age, marker)`, `starts_with("age")`, or `all_continuous()`.
+- Pass two or more instructions in a `list()`.
+- Example from the slides: `statistic = list(age ~ "{mean} ({sd})", response ~ "{n} / {N} ({p}%)")`
+:::
+
+## Add-on functions
+
+| Family | Functions | What they do |
+|------------------------|------------------------|------------------------|
+| `add_*()` | `add_p()`, `add_q()` | p-values; multiple-comparison adjustment via `p.adjust()` (e.g., Bonferroni) |
+|  | `add_difference()` | mean or rate difference between two groups with CI and p-value |
+|  | `add_overall()`, `add_n()`, `add_stat_label()`, `add_stat()` | overall column, sample size, stat description, custom statistics |
+| `bold_*()`, `italicize_*()` | `bold_labels()`, `italicize_levels()`, `bold_p(t = )` | styling |
+| `modify_*()` | `modify_header()`, `modify_spanning_header()`, `modify_footnote()` | headers and footnotes; `show_header_names()` reveals internal names |
+
+## Other table types
+
+::: incremental
+- **`tbl_cross()`**: wrapper for n × m cross-tabs; takes `row`, `col`, `percent`, `margin`; pair with `add_p(source_note = TRUE)`.
+- **`tbl_svysummary()`**: survey data via `survey::svydesign()`; p-values use the Rao & Scott second-order correction.
+- **`tbl_survfit()`**: survival probabilities at chosen times (e.g., 12 and 24 months) with a log-rank p-value.
+:::
+
+## Regression tables
+
+::::: columns
+::: {.column width="50%"}
+- Base `summary(glm)` output is messy and hard for others to read.
+- `tbl_regression()` shows p-values and reference levels for categorical variables.
+- `exponentiate = TRUE` gives odds ratios.
+- `add_global_p()` and `add_glance_table()` add global p-values and model statistics (nobs, logLik, AIC, BIC).
+- `tbl_uvregression()` runs univariate models using `method`, `method.args`, and `y`.
+:::
+
+::: {.column width="50%"}
+```{r}
+m_demo <- glm(response ~ age + stage, data = trial, family = binomial)
+
+tbl_regression(m_demo, exponentiate = TRUE) %>%
+  add_global_p() %>%
+  add_glance_table(include = c(nobs, AIC, BIC))
+```
+:::
+:::::
+
+## Reporting and combining tables
+
+::: incremental
+- **`inline_text()`** pulls results into prose, so numbers update automatically when the data change.
+- **`tbl_merge()`**: side by side (e.g., univariable and multivariable), with `tab_spanner`.
+- **`tbl_stack()`**: stacked vertically (e.g., unadjusted vs. adjusted), with `group_header`.
+- **`tbl_strata()`**: the same table repeated within strata (e.g., by grade).
+- Custom functions can combine these pieces, as in the slides' `tbl_cmh()` (Cochran-Mantel-Haenszel table).
+:::
+
+## Themes and print engines
+
+::::: columns
+::: {.column width="50%"}
+**Themes**
+
+- `reset_gtsummary_theme()` restores defaults
+- `theme_gtsummary_journal("jama")`
+- `theme_gtsummary_language("zh-tw")`
+- `theme_gtsummary_compact()`
+- `set_gtsummary_theme()` for a custom theme
+:::
+
+::: {.column width="50%"}
+**Print engines**
+
+- `as_gt()`, `as_kable()`, `as_flex_table()`, `as_kable_extra()`, `as_hux_table()`, `as_tibble()`
+- Support varies by output format (HTML, PDF, RTF, Word)
+- `as_gt()` is strongest for HTML; `as_flex_table()` works well for Word
+:::
+:::::
+
+## Benefits to my school work / career
+
+::: fragment
+**School:** {gtsummary} turns the statistics I already run into clean, professional tables with a few lines of code. For my capstone and other coursework, I can build a Table 1, cross-tabs with p-values, and regression tables with odds ratios and confidence intervals without formatting anything by hand. Because the tables are generated from code, I can re-run the report when my data change, and with `inline_text()` the numbers in my written results update automatically. That saves time and reduces copy-paste errors.
+
+**Career:** Employers value analysis that is reproducible and easy for non-technical readers to understand. Being able to produce publication-quality summary tables, export them to HTML or Word, and standardize their look with themes lets me deliver reports to managers and clients quickly. The same workflow applies to customer segmentation, survey results, A/B tests, or any project where I need to show how groups differ and which factors matter.
+:::
+
+::: aside
+Resources: [gtsummary website](http://www.danieldsjoberg.com/gtsummary/)
+:::
+
+# Prompt 2: The extended lecture {background-color="#8c2f39"}
+
+## 2.1 How does {gtsummary} differ from {gt} and {gtExtras}?
+
+::::: columns
+::: {.column width="50%"}
+**{gtsummary}**
+
+- Purpose-built for statistical summaries: Table 1, regression, survival, survey
+- Computes the statistics for you (tests, CIs, p-values)
+- Can hand its table to {gt} with `as_gt()` for further styling
+:::
+
+::: {.column width="50%"}
+**{gt} / {gtExtras}**
+
+- {gt}: a general table-formatting package; you supply the data and the formatting
+- {gtExtras}: extends {gt} with extra themes and inline visuals
+- (Check this against the lecture and edit in your own words.)
+:::
+:::::
+
+## 2.2 Three new things I learned
+
+DRAFT CANDIDATES from the notes. Keep three that were NOT in the Step 1 lecture, and rewrite in your own words:
+
+1.  `inline_text()` lets reports cite table results in sentences[^1]
+2.  `tbl_strata()` and `tbl_stack()` / `tbl_merge()` build stratified and combined tables
+3.  `tbl_survfit()`, `theme_gtsummary_language()`, or the custom `tbl_cmh()` built from smaller pieces
+4.  Print engines differ in HTML/PDF/RTF/Word support
+
+[^1]: Slides: renders as "1.02 (95% CI 1.00, 1.04; p=0.10)".
+
+# Prompt 3: Cross-tabulation with CEP data {background-color="#8c2f39"}
+
+## Prompt 3 (type the full prompt here)
+
+::: prompt
+Apply what you learned to your MSDM CEP data. Choose two appropriate variables for cross-tabulation and show if the two variables are associated or not. Use appropriate statistics to test if the two variables are associated. Code, produce the table, and interpret the result.
+:::
+
+## Why these two variables?
+
+I cross-tabulated **year in school** (Freshman through Senior) with **satisfaction level** (Low, Medium, High). Both are categorical, so a chi-square test of independence is appropriate. The question is whether satisfaction differs by year in school.
+
+::: highlight-box
+**Note:** My CEP survey data is not available yet, so this example uses *simulated* responses to demonstrate the method. I will re-run the same code on my real survey data once it is collected.
+:::
+
+## Code and table
+
+```{r}
+set.seed(123)
+dat <- tibble(
+  year   = factor(sample(c("Freshman", "Sophomore", "Junior", "Senior"), 200, replace = TRUE),
+                  levels = c("Freshman", "Sophomore", "Junior", "Senior")),
+  satisf = factor(sample(c("Low", "Medium", "High"), 200, replace = TRUE),
+                  levels = c("Low", "Medium", "High"))
+)   # simulated stand-in; replace with my CEP survey data later
+
+dat %>%
+  tbl_cross(
+    row = year, col = satisf,
+    percent = "row",
+    label = list(year ~ "Year in School", satisf ~ "Satisfaction")
+  ) %>%
+  add_p(source_note = TRUE)
+```
+
+```{r}
+#| include: false
+p_val <- chisq.test(table(dat$year, dat$satisf))$p.value
+```
+
+## Interpretation
+
+The chi-square test of independence gave p = `r signif(p_val, 2)`. `r if (p_val < 0.05) "This is below 0.05, so I reject the null hypothesis and conclude that year in school and satisfaction are associated." else "This is above 0.05, so I fail to reject the null hypothesis: there is no evidence that year in school and satisfaction are associated."`
+
+::: fragment
+Because these responses are randomly generated, this result reflects chance only. It shows how I would read a real result, not a real finding about students.
+:::
+
+# Prompt 4: Multiple regression {background-color="#8c2f39"}
+
+## Prompt 4 
+
+::: prompt
+Using the MSDM CEP data, run multiple regression. The dependent variable can be continuous or dichotomous. Regress a dependent variable on a set of independent variables. Code, produce the table, and interpret the result.
+:::
+
+## Variables and why
+
+I regressed a continuous **satisfaction score** (0 to 100) on three predictors: **weekly study hours**, **year in school**, and **employment status**. The outcome is continuous, so ordinary least squares (`lm()`) is appropriate. The question is which factors predict satisfaction while holding the others constant.
+
+::: highlight-box
+**Note:** My CEP survey data is not available yet, so this example uses *simulated* responses to demonstrate the method. I will re-run the same code on my real data once it is collected.
+:::
+
+## Code and table
+
+```{r}
+set.seed(456)
+n <- 200
+dat4 <- tibble(
+  study_hours = round(runif(n, 0, 20)),
+  year        = factor(sample(c("Freshman", "Sophomore", "Junior", "Senior"), n, replace = TRUE),
+                       levels = c("Freshman", "Sophomore", "Junior", "Senior")),
+  employed    = factor(sample(c("No", "Yes"), n, replace = TRUE), levels = c("No", "Yes"))
+) %>%
+  mutate(score = round(50 + 1.5 * study_hours - 4 * (employed == "Yes") + rnorm(n, 0, 10)))
+# simulated stand-in; replace with my CEP survey data later
+
+m4 <- lm(score ~ study_hours + year + employed, data = dat4)
+
+tbl_regression(
+  m4,
+  label = list(study_hours ~ "Weekly study hours",
+               year ~ "Year in school",
+               employed ~ "Employed")
+) %>%
+  add_glance_table(include = c(nobs, r.squared, adj.r.squared)) %>%
+  bold_p()
+```
+
+```{r}
+#| include: false
+co      <- summary(m4)$coefficients
+b_study <- co["study_hours", "Estimate"]
+p_study <- co["study_hours", "Pr(>|t|)"]
+b_emp   <- co["employedYes", "Estimate"]
+p_emp   <- co["employedYes", "Pr(>|t|)"]
+adj_r2  <- summary(m4)$adj.r.squared
+```
+
+## Interpretation
+
+- **Study hours:** Holding year and employment constant, each additional weekly study hour is associated with a `r round(b_study, 2)`-point change in satisfaction (p = `r signif(p_study, 2)`).
+- **Employment:** Employed students scored `r round(abs(b_emp), 1)` points `r if (b_emp < 0) "lower" else "higher"` than non-employed students, holding the other variables constant (p = `r signif(p_emp, 2)`), which is `r if (p_emp < 0.05) "statistically significant" else "not statistically significant"` at the 0.05 level.
+- **Year in school:** Each coefficient compares a year to Freshman, the reference level. Year was not built into the simulation, so any differences here reflect chance.
+- **Model fit:** Adjusted R² = `r round(adj_r2, 2)`, meaning the model explains about `r round(100 * adj_r2)`% of the variation in satisfaction.
+
+::: fragment
+Because these data are simulated, this shows how I would read a real regression table, not a real finding about students. With real data I would also check the model assumptions (linearity, constant variance, normal residuals).
+:::
+
+::: prompt
+Using the MSDM CEP data, run multiple regression. The dependent variable can be continuous or dichotomous. Regress a dependent variable on a set of independent variables. Code, produce the table, and interpret the result.
+:::
+
+## Model and table
+
+```{r}
+#| eval: false     # remove once ready
+# Continuous DV -> lm(); dichotomous DV -> glm(family = binomial) with exponentiate = TRUE
+m1 <- lm(DV ~ IV1 + IV2 + IV3, data = cep)
+
+tbl_regression(m1) %>%
+  add_glance_table(include = c(nobs, r.squared, adj.r.squared)) %>%
+  bold_p()
+```
+
+# Appendix {background-color="#555555"}
+
+## Links
+
+- GitHub Repo: PASTE LINK
+- GitHub Pages: PASTE LINK
+
+## References
+
+::: {#refs}
+:::
