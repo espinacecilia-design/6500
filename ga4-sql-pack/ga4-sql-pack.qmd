@@ -305,5 +305,5 @@ Completing this SQL pack taught me how much careful definition matters in GA4 an
 
 ## Appendix
 
-- **GitHub repository:** `[PASTE GITHUB REPO LINK HERE]`
-- **GitHub Pages:** `[PASTE GITHUB PAGES LINK HERE]`
+- **GitHub repository:** `https://github.com/espinacecilia-design/6500`
+- **GitHub Pages:** `https://espinacecilia-design.github.io/6500/ga4-sql-pack.html`
