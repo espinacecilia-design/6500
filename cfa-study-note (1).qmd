@@ -322,5 +322,5 @@ For example: cross-validation on a new sample, item wording and theory, modifica
 
 ## Project Links
 
-- [GitHub Repository](PASTE YOUR GITHUB REPOSITORY LINK HERE)
-- [GitHub Pages Website](PASTE YOUR GITHUB PAGES LINK HERE)
+- [GitHub Repository](https://github.com/espinacecilia-design/6500)
+- [GitHub Pages Website](https://espinacecilia-design.github.io/6500/cfa-study-note.html)
