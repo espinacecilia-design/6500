@@ -1,0 +1,309 @@
+---
+title: "GA4-4 SQL Pack (Individual)"
+subtitle: "Eight BigQuery queries on GA4 event data"
+author: "Cecilia Espina"
+date: "2026-11-11"
+format:
+  html:
+    toc: true
+    toc-depth: 2
+    code-fold: false
+    code-copy: true
+    embed-resources: true
+    theme: cosmo
+execute:
+  eval: false
+  echo: true
+---
+
+## Overview
+
+This pack contains eight Google BigQuery (GoogleSQL) queries written against the GA4 BigQuery export schema. Every query follows the same rules so a teammate can reuse it:
+
+- **Dataset:** `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*` (Google Merchandise Store sample export; data runs Nov 1, 2020 to Jan 31, 2021).
+- **Date scoping:** every query filters `_TABLE_SUFFIX` so BigQuery only scans the daily tables it needs.
+- **Parameters:** values inside `event_params` are always pulled with `UNNEST(event_params)` and a `key = '...'` match, using the correct value type.
+- **Metric definitions:** a "session" is `user_pseudo_id` + `ga_session_id`. `COUNT(*)` always means events, never users or sessions.
+
+If your team's GA4 export lives in a different project or dataset, replace the table name in the `FROM` line of each query. Everything else stays the same.
+
+### Coverage map
+
+| Query | Filtering | Grouping | UNNEST | CTE | Join / combine |
+|---|:-:|:-:|:-:|:-:|:-:|
+| 1. Daily page views, mobile US | ✔ | ✔ | | | |
+| 2. Top purchases, Black Friday week | ✔ | | | | |
+| 3. Event inventory | | ✔ | | | |
+| 4. Revenue by device | | ✔ | | | |
+| 5. Top pages | ✔ | ✔ | ✔ | | |
+| 6. Engagement per day | | ✔ | ✔ | ✔ | |
+| 7. Session funnel | | ✔ | ✔ | ✔ | ✔ (multi-step) |
+| 8. Daily conversion rate | | ✔ | ✔ | ✔ | ✔ (join) |
+
+## Query 1: Daily page views, mobile users in the US
+
+```sql
+-- Daily page views and unique users for US mobile traffic, December 2020
+SELECT
+  PARSE_DATE('%Y%m%d', event_date)  AS event_date,
+  COUNT(*)                          AS page_views,
+  COUNT(DISTINCT user_pseudo_id)    AS users
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'   -- scan December only
+  AND event_name = 'page_view'
+  AND device.category = 'mobile'
+  AND geo.country = 'United States'
+GROUP BY event_date
+ORDER BY event_date;
+```
+
+**Results:**
+
+![Query 1 results in BigQuery](images/query1.png){fig-alt="BigQuery results for Query 1"}
+
+**Explanation.** This query answers how much page-view traffic US mobile visitors generated each day in December 2020. It works by limiting the table scan with `_TABLE_SUFFIX`, then filtering to `page_view` events on mobile devices in the US before counting. You would use it as a quick traffic trend or as a base for a mobile-only dashboard. Caveat: `page_views` counts events while `users` counts distinct `user_pseudo_id` values (cookie or device IDs), so the same person on two devices is counted twice.
+
+## Query 2: Largest purchases during Black Friday week
+
+```sql
+-- Top 20 purchase transactions, Nov 27 to Nov 30, 2020
+SELECT
+  PARSE_DATE('%Y%m%d', event_date)       AS event_date,
+  ecommerce.transaction_id               AS transaction_id,
+  ecommerce.purchase_revenue_in_usd      AS revenue_usd,
+  ecommerce.total_item_quantity          AS items,
+  device.category                        AS device_category,
+  geo.country                            AS country
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201127' AND '20201130'   -- Black Friday through Cyber Monday
+  AND event_name = 'purchase'
+  AND ecommerce.purchase_revenue_in_usd > 0
+ORDER BY revenue_usd DESC
+LIMIT 20;
+```
+
+**Results:**
+
+![Query 2 results in BigQuery](images/query2.png){fig-alt="BigQuery results for Query 2"}
+
+**Explanation.** This query lists the 20 highest-revenue orders during the Black Friday to Cyber Monday window, with device and country for context. It filters on a four-day table range, the `purchase` event name, and positive revenue so it only reads the data it needs. It is useful for spotting high-value orders or checking whether revenue is concentrated in a few buyers. Caveat: the sample dataset is obfuscated, so revenue and transaction IDs are real enough for practice but should not be read as the actual store's figures.
+
+## Query 3: Event inventory for one week
+
+```sql
+-- How often does each event fire, and how many users trigger it? (Dec 1-7, 2020)
+SELECT
+  event_name,
+  COUNT(*)                                              AS events,
+  COUNT(DISTINCT user_pseudo_id)                        AS users,
+  ROUND(SAFE_DIVIDE(COUNT(*), COUNT(DISTINCT user_pseudo_id)), 2) AS events_per_user
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201207'
+GROUP BY event_name
+HAVING COUNT(*) >= 1000        -- drop very rare events
+ORDER BY events DESC;
+```
+
+**Results:**
+
+![Query 3 results in BigQuery](images/query3.png){fig-alt="BigQuery results for Query 3"}
+
+**Reading the output.** In the screenshot, `page_view` leads with 132,803 events from 25,000 users, and `first_visit` fires about once per user (1.0 events per user), which is what you would expect for a first-visit event.
+
+**Explanation.** This query builds an inventory of which events exist in the export, how often each fires, and how many distinct users trigger it. It groups by `event_name` and uses `HAVING` to keep only events with at least 1,000 occurrences. You would run it first on any new GA4 property to learn what is tracked before writing deeper queries. Caveat: `events` and `users` answer different questions, and `events_per_user` is an average that a few heavy users can inflate.
+
+## Query 4: Purchases and revenue by device category
+
+```sql
+-- Orders, revenue, and average order value by device category, December 2020
+SELECT
+  device.category                                              AS device_category,
+  COUNT(DISTINCT ecommerce.transaction_id)                     AS orders,
+  COUNT(DISTINCT user_pseudo_id)                               AS buyers,
+  ROUND(SUM(ecommerce.purchase_revenue_in_usd), 2)             AS revenue_usd,
+  ROUND(SAFE_DIVIDE(SUM(ecommerce.purchase_revenue_in_usd),
+                    COUNT(DISTINCT ecommerce.transaction_id)), 2) AS avg_order_value_usd
+FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'
+  AND event_name = 'purchase'
+  AND ecommerce.transaction_id IS NOT NULL
+  AND ecommerce.transaction_id != '(not set)'
+GROUP BY device_category
+ORDER BY revenue_usd DESC;
+```
+
+**Results:**
+
+![Query 4 results in BigQuery](images/query4.png){fig-alt="BigQuery results for Query 4"}
+
+**Reading the output.** Desktop produced the most revenue (about $97,752 from 1,349 orders, $72.46 average order value). Mobile was close behind in orders (921) but had a lower average order value ($65.64).
+
+**Explanation.** This query compares desktop, mobile, and tablet on number of orders, number of buyers, total revenue, and average order value. It groups purchase events by device category and uses `COUNT(DISTINCT transaction_id)` for orders so duplicate purchase hits are not double counted. It helps decide where to focus optimization or ad spend. Caveat: I excluded missing and `(not set)` transaction IDs, which keeps order counts honest but means revenue on those rows is left out.
+
+## Query 5: Top pages by page views (UNNEST `page_location`)
+
+```sql
+-- Top 15 pages by views, with query strings removed, December 2020
+SELECT
+  REGEXP_EXTRACT(page_location, r'^https?://[^/]+(/[^?#]*)') AS page_path,
+  COUNT(*)                                                    AS page_views,
+  COUNT(DISTINCT user_pseudo_id)                              AS users
+FROM (
+  SELECT
+    user_pseudo_id,
+    (SELECT value.string_value
+       FROM UNNEST(event_params)
+      WHERE key = 'page_location') AS page_location      -- string parameter
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'
+    AND event_name = 'page_view'
+)
+WHERE page_location IS NOT NULL
+GROUP BY page_path
+ORDER BY page_views DESC
+LIMIT 15;
+```
+
+**Results:**
+
+![Query 5 results in BigQuery](images/query5.png){fig-alt="BigQuery results for Query 5"}
+
+**Explanation.** This query ranks the most viewed pages on the site. It extracts `page_location` from the repeated `event_params` field with a scalar subquery that matches `key = 'page_location'` and reads `string_value`, then strips the domain and query string with a regular expression so the same page is not split across URLs. Use it to see which content or product pages draw attention. Caveat: if the key filter were missing, the subquery would return the wrong parameter, and pages with tracking parameters would otherwise appear as separate rows.
+
+## Query 6: Engagement time per day (UNNEST integer parameters, CTE)
+
+```sql
+-- Engaged sessions and average engagement time per session by day, December 2020
+WITH engagement AS (
+  SELECT
+    PARSE_DATE('%Y%m%d', event_date) AS event_date,
+    user_pseudo_id,
+    (SELECT value.int_value FROM UNNEST(event_params)
+      WHERE key = 'ga_session_id')           AS ga_session_id,        -- INT parameter
+    (SELECT value.int_value FROM UNNEST(event_params)
+      WHERE key = 'engagement_time_msec')    AS engagement_time_msec  -- INT parameter
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'
+    AND event_name = 'user_engagement'
+)
+SELECT
+  event_date,
+  COUNT(DISTINCT CONCAT(user_pseudo_id, '-', CAST(ga_session_id AS STRING))) AS engaged_sessions,
+  ROUND(SUM(engagement_time_msec) / 1000 / 60, 1)                            AS total_engaged_minutes,
+  ROUND(SAFE_DIVIDE(SUM(engagement_time_msec) / 1000,
+        COUNT(DISTINCT CONCAT(user_pseudo_id, '-', CAST(ga_session_id AS STRING)))), 1) AS avg_engaged_seconds_per_session
+FROM engagement
+WHERE ga_session_id IS NOT NULL
+GROUP BY event_date
+ORDER BY event_date;
+```
+
+**Results:**
+
+![Query 6 results in BigQuery](images/query6.png){fig-alt="BigQuery results for Query 6"}
+
+**Explanation.** This query measures how much time engaged sessions spend on the site each day. A CTE first extracts two integer parameters, `ga_session_id` and `engagement_time_msec`, using `int_value`, then the main query builds a session key and aggregates. It is useful for tracking engagement quality alongside traffic volume. Caveat: GA4 session IDs are only unique within a user, so the session key combines `user_pseudo_id` and `ga_session_id`, and the metric only covers sessions that fired a `user_engagement` event.
+
+## Query 7: Session-level purchase funnel (multi-CTE)
+
+```sql
+-- Funnel: session -> view item -> add to cart -> begin checkout -> purchase (Dec 2020)
+WITH session_events AS (
+  SELECT
+    user_pseudo_id,
+    (SELECT value.int_value FROM UNNEST(event_params)
+      WHERE key = 'ga_session_id') AS ga_session_id,
+    event_name
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'
+    AND event_name IN ('session_start', 'view_item', 'add_to_cart', 'begin_checkout', 'purchase')
+),
+
+session_flags AS (
+  SELECT
+    CONCAT(user_pseudo_id, '-', CAST(ga_session_id AS STRING)) AS session_key,
+    LOGICAL_OR(event_name = 'session_start')   AS had_session_start,
+    LOGICAL_OR(event_name = 'view_item')       AS viewed_item,
+    LOGICAL_OR(event_name = 'add_to_cart')     AS added_to_cart,
+    LOGICAL_OR(event_name = 'begin_checkout')  AS began_checkout,
+    LOGICAL_OR(event_name = 'purchase')        AS purchased
+  FROM session_events
+  WHERE ga_session_id IS NOT NULL
+  GROUP BY session_key
+)
+
+SELECT
+  COUNTIF(had_session_start)                                    AS sessions,
+  COUNTIF(viewed_item)                                          AS view_item_sessions,
+  COUNTIF(added_to_cart)                                        AS add_to_cart_sessions,
+  COUNTIF(began_checkout)                                       AS checkout_sessions,
+  COUNTIF(purchased)                                            AS purchase_sessions,
+  ROUND(100 * SAFE_DIVIDE(COUNTIF(added_to_cart), COUNTIF(viewed_item)), 1)     AS pct_view_to_cart,
+  ROUND(100 * SAFE_DIVIDE(COUNTIF(began_checkout), COUNTIF(added_to_cart)), 1)  AS pct_cart_to_checkout,
+  ROUND(100 * SAFE_DIVIDE(COUNTIF(purchased), COUNTIF(began_checkout)), 1)      AS pct_checkout_to_purchase
+FROM session_flags;
+```
+
+**Results:**
+
+![Query 7 results in BigQuery](images/query7.png){fig-alt="BigQuery results for Query 7"}
+
+**Reading the output.** Of 131,793 sessions, 27,976 viewed an item, 8,450 added to cart, 4,362 began checkout, and 2,116 purchased. That is a 30.2% view-to-cart rate, about 51.6% cart-to-checkout, and about 48.5% checkout-to-purchase.
+
+**Explanation.** This query counts how many sessions reach each stage of the shopping funnel and the step-to-step conversion rates. The first CTE pulls the session ID out of `event_params` for only the funnel events, the second collapses events into one row per session with yes/no flags, and the final select counts each flag. Use it to find where shoppers drop off. Caveat: the funnel is counted by session, not by strict order of events, so a session that purchased without a recorded `view_item` still counts toward later stages.
+
+## Query 8: Daily sessions joined to daily orders (conversion rate)
+
+```sql
+-- Daily session conversion rate: sessions CTE joined to orders CTE, December 2020
+WITH daily_sessions AS (
+  SELECT
+    event_date,
+    COUNT(DISTINCT CONCAT(user_pseudo_id, '-',
+          CAST((SELECT value.int_value FROM UNNEST(event_params)
+                 WHERE key = 'ga_session_id') AS STRING))) AS sessions
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'
+    AND event_name = 'session_start'
+  GROUP BY event_date
+),
+
+daily_orders AS (
+  SELECT
+    event_date,
+    COUNT(DISTINCT ecommerce.transaction_id)          AS orders,
+    ROUND(SUM(ecommerce.purchase_revenue_in_usd), 2)  AS revenue_usd
+  FROM `bigquery-public-data.ga4_obfuscated_sample_ecommerce.events_*`
+  WHERE _TABLE_SUFFIX BETWEEN '20201201' AND '20201231'
+    AND event_name = 'purchase'
+    AND ecommerce.transaction_id IS NOT NULL
+    AND ecommerce.transaction_id != '(not set)'
+  GROUP BY event_date
+)
+
+SELECT
+  PARSE_DATE('%Y%m%d', s.event_date)                              AS event_date,
+  s.sessions,
+  COALESCE(o.orders, 0)                                           AS orders,
+  COALESCE(o.revenue_usd, 0)                                      AS revenue_usd,
+  ROUND(100 * SAFE_DIVIDE(COALESCE(o.orders, 0), s.sessions), 2)  AS conversion_rate_pct
+FROM daily_sessions AS s
+LEFT JOIN daily_orders AS o
+  ON s.event_date = o.event_date
+ORDER BY event_date;
+```
+
+**Results:**
+
+![Query 8 results in BigQuery](images/query8.png){fig-alt="BigQuery results for Query 8"}
+
+**Explanation.** This query calculates a daily conversion rate by joining a table of daily sessions to a table of daily orders on the date. One CTE counts sessions (extracting `ga_session_id` with `UNNEST`), the other counts distinct orders and revenue, and a `LEFT JOIN` keeps days with zero orders. It is the kind of base table a team mart could build on for trend charts. Caveat: orders are counted by purchase date and sessions by session start date, so sessions spanning midnight can shift a small amount of conversion between days.
+
+## Reflection
+
+Completing this SQL pack taught me how much careful definition matters in GA4 analysis. The results showed me patterns I could only see after writing the queries: daily US mobile page views dropped over the first weekend of December (about 2,175 on Dec 5 versus 3,694 on Dec 1), and the event inventory showed page_view as the most common event at 132,803 events, with first_visit firing about once per user. Working with UNNEST(event_params) was the key technical skill, because pulling page_location and ga_session_id only worked when I matched the right key and value type. That let me find that the homepage was the top page (82,084 views) and that the basket page had 30,844 views from only 8,601 users, which suggests many repeat visits to the cart. The funnel query showed 131,793 sessions leading to 2,116 purchase sessions, about 1.6%, and the daily conversion rates ranged from about 1.2% to 2.4% in the days I reviewed, which matches that overall figure. Desktop also produced more revenue than mobile (about $97,752 versus $60,450) with a higher average order value ($72.46 versus $65.64).
+
+## Appendix
+
+- **GitHub repository:** `[PASTE GITHUB REPO LINK HERE]`
+- **GitHub Pages:** `[PASTE GITHUB PAGES LINK HERE]`
