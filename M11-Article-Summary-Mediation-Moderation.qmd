@@ -209,5 +209,5 @@ summary(step1); summary(step2); summary(step3)
 
 ## Appendix
 
-- **GitHub Repo:** [ADD LINK – paste your repo URL here]
-- **GitHub Pages:** [ADD LINK – paste your published HTML URL here]
+- **GitHub Repo:** [https://github.com/espinacecilia-design/6500](https://github.com/espinacecilia-design/6500)
+- **GitHub Pages:** [https://espinacecilia-design.github.io/6500/M11-Article-Summary-Mediation-Moderation.html](https://espinacecilia-design.github.io/6500/M11-Article-Summary-Mediation-Moderation.html)
