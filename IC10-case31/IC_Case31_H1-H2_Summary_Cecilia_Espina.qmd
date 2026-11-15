@@ -1,0 +1,260 @@
+---
+title: "Case 31 – Employees Federal Credit Union"
+subtitle: "Summary of Data Analysis: H1 & H2"
+author: "Cecilia Espina"
+date: today
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    embed-resources: true
+    transition: fade
+    width: 1280
+    height: 720
+    margin: 0.06
+    fig-align: center
+    include-in-header:
+      - text: |
+          <style>
+            .reveal { font-size: 30px; }
+            .reveal h1 { font-size: 1.6em; }
+            .reveal h2 { font-size: 1.15em; margin-bottom: 0.3em; }
+            .reveal table { font-size: 0.6em; margin: 0 auto; line-height: 1.15; }
+            .reveal table th { background: #eef3f8; }
+            .reveal table td, .reveal table th { padding: 0.18em 0.4em; }
+            .reveal .rq table { font-size: 0.78em; }
+            .reveal .rq table td, .reveal .rq table th { padding: 0.35em 0.5em; }
+            .reveal .insight { background: #f3f7fb; border-left: 6px solid #2F6F9F;
+                               padding: 0.25em 0.7em; font-size: 0.72em; margin-top: 0.4em; }
+            .reveal .insight p { margin: 0.2em 0; }
+            .reveal ul li, .reveal ol li { margin-bottom: 0.2em; }
+            .reveal figure { margin: 0; }
+          </style>
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r setup}
+library(haven)
+library(dplyr)
+library(ggplot2)
+library(knitr)
+library(car)  # for Levene test
+
+# Cleaned SPSS file from Module 10; keep it in the same folder as this QMD
+efcu <- read_sav("Case 31 Data_efcu_4.sav", user_na = TRUE) |>
+  mutate(across(where(is.labelled), as.numeric))
+
+# q13_r is reverse-coded awareness: 1 = unaware, 2 = aware but not used, 3 = aware and used
+d <- efcu |>
+  transmute(
+    aware_share     = factor(q13_r, levels = 1:3,
+                             labels = c("Unaware", "Aware, not used", "Aware and used")),
+    needs           = q33,   # services meet members' needs (1-5)
+    loan_rate_op    = Q8_r,  # opinion on rates charged on loans (1 very low - 5 very high)
+    loan_rate_lower = q30    # agree CU loan rates are lower than others (1-5)
+  )
+
+f2 <- function(x) sprintf("%.2f", x)
+f1 <- function(x) sprintf("%.1f", x)
+pf <- function(p) ifelse(p < .001, "*p* < .001", paste0("*p* = ", sub("^0", "", sprintf("%.3f", p))))
+n_total <- nrow(d)
+```
+
+```{r h1-stats}
+# ---- H1: one-way ANOVA ----
+g <- d |>
+  group_by(aware_share) |>
+  summarise(n = n(), M = mean(needs), SD = sd(needs), .groups = "drop") |>
+  mutate(se = SD / sqrt(n),
+         lo = M - qt(.975, n - 1) * se,
+         hi = M + qt(.975, n - 1) * se)
+
+fit   <- aov(needs ~ aware_share, data = d)
+a     <- summary(fit)[[1]]
+F1    <- a[["F value"]][1]
+p1    <- a[["Pr(>F)"]][1]
+dfb   <- a[["Df"]][1]
+dfw   <- a[["Df"]][2]
+eta2  <- a[["Sum Sq"]][1] / sum(a[["Sum Sq"]])
+
+lev   <- car::leveneTest(needs ~ aware_share, data = d)       # median-centered (Brown-Forsythe)
+lev_p <- lev[["Pr(>F)"]][1]
+shap  <- shapiro.test(residuals(fit))
+welch <- oneway.test(needs ~ aware_share, data = d, var.equal = FALSE)
+kw    <- kruskal.test(needs ~ aware_share, data = d)
+
+tk <- TukeyHSD(fit)$aware_share
+tk_df <- data.frame(
+  Comparison = rownames(tk),
+  Diff = tk[, "diff"], Lower = tk[, "lwr"], Upper = tk[, "upr"], p = tk[, "p adj"],
+  row.names = NULL
+)
+```
+
+```{r h2-stats}
+# ---- H2: paired-samples t-test ----
+h2 <- d |> filter(!is.na(loan_rate_op), !is.na(loan_rate_lower))
+n2 <- nrow(h2)
+diffs <- h2$loan_rate_op - h2$loan_rate_lower
+tt <- t.test(h2$loan_rate_op, h2$loan_rate_lower, paired = TRUE)
+dz <- mean(diffs) / sd(diffs)
+r_pair <- cor(h2$loan_rate_op, h2$loan_rate_lower)
+shap2 <- shapiro.test(diffs)
+wil <- wilcox.test(h2$loan_rate_op, h2$loan_rate_lower, paired = TRUE, exact = FALSE)
+n_excluded <- n_total - n2
+```
+
+## Hypotheses covered {.smaller}
+
+| | Hypothesis | Variables | Test |
+|---|---|---|---|
+| **H1** | Awareness of the regular share account influences opinions on whether services meet members' needs | Q13r (awareness, 3 levels) → Q33 (1–5) | One-way ANOVA |
+| **H2** | Members do not differ in their opinion of the credit union's loan rates (Q8r) and their agreement that its loan rates are lower than competitors' (Q30) | Q8r and Q30, both 1–5 | Paired-samples *t*-test |
+
+::: {.insight}
+Data: `r n_total` EFCU members who returned usable questionnaires (cleaned file `Case31_Data_efcu_4.sav`). Results are described first; test statistics appear in parentheses.
+:::
+
+## H1: Why a one-way ANOVA?
+
+- **One independent variable with three groups**: members who are unaware of the regular share account, aware but have not used it, and aware and have used it.
+- **One interval-type outcome**: agreement (1–5) that the credit union's services meet members' needs.
+- The groups are **different people**, so the observations are independent.
+- ANOVA compares all three means in **one test**, which avoids the inflated error risk of running several *t*-tests. If it is significant, a post hoc test shows which groups differ.
+
+## H1: Who feels their needs are met?
+
+```{r h1-table}
+g |>
+  transmute(`Awareness of regular share account` = aware_share,
+            n = n, Mean = f2(M), SD = f2(SD),
+            `95% CI` = paste0("[", f2(lo), ", ", f2(hi), "]")) |>
+  kable(align = "lccccc")
+```
+
+Most members (`r g$n[1]` of `r n_total`) did not know the regular share account existed, and only `r g$n[3]` have used it. Members who were unaware (*M* = `r f2(g$M[1])`) and those aware but not using it (*M* = `r f2(g$M[2])`) both sit between "uncertain" and "agree". Members who actually use the account are the **least** convinced that services meet their needs (*M* = `r f2(g$M[3])`, roughly "uncertain").
+
+## H1: The pattern
+
+```{r h1-plot}
+#| fig-width: 8
+#| fig-height: 4.6
+ggplot(g, aes(aware_share, M)) +
+  geom_col(fill = "#2F6F9F", width = .55) +
+  geom_errorbar(aes(ymin = lo, ymax = hi), width = .12, linewidth = .7) +
+  geom_text(aes(label = paste0("n = ", n), y = 1.15), colour = "white", size = 5) +
+  coord_cartesian(ylim = c(1, 5)) +
+  labs(x = NULL, y = "Services meet members' needs (1–5)",
+       caption = "Bars show means; error bars show 95% confidence intervals") +
+  theme_minimal(base_size = 17)
+```
+
+## H1: Do the groups differ?
+
+Yes. Opinions on whether services meet members' needs differ by awareness of the regular share account (*F*(`r dfb`, `r dfw`) = `r f2(F1)`, `r pf(p1)`, η² = `r f2(eta2)`). Awareness explains about `r f1(eta2*100)`% of the variation, a small-to-medium effect.
+
+The post hoc test shows where the difference lies:
+
+```{r h1-tukey}
+tk_df |>
+  transmute(Comparison, `Mean difference` = f2(Diff),
+            `95% CI` = paste0("[", f2(Lower), ", ", f2(Upper), "]"),
+            `Tukey p` = ifelse(p < .001, "< .001", sub("^0", "", sprintf("%.3f", p)))) |>
+  kable(align = "lccc")
+```
+
+Users of the account differ from both other groups. The unaware and aware-but-not-used groups are indistinguishable.
+
+## H1: Can we trust this result?
+
+- **Equal variances:** the spread is similar across groups (Levene, `r pf(lev_p)`).
+- **Normality:** residuals are not normal (Shapiro–Wilk *W* = `r f2(shap$statistic)`, `r pf(shap$p.value)`), which is expected for 1–5 ratings. With 128 respondents, ANOVA is usually robust to this, but the smallest group is only `r min(g$n)`.
+- **Robustness checks agree:** Welch's ANOVA (*F*(`r dfb`, `r f1(welch$parameter[2])`) = `r f2(welch$statistic)`, `r pf(welch$p.value)`) and the Kruskal–Wallis test (χ²(2) = `r f2(kw$statistic)`, `r pf(kw$p.value)`) both reach the same conclusion.
+
+::: {.insight}
+The significant result does not depend on the equal-variance and normality assumptions.
+:::
+
+## H1: Conclusion
+
+**H1 is supported**: awareness of the regular share account is related to opinions about whether services meet members' needs.
+
+- The relationship is **not** "more awareness, more satisfaction". Awareness alone changes nothing: unaware members and aware non-users look the same.
+- The gap appears only for **members who use the account**, who are the least positive.
+- Only `r g$n[3]` members are in that group, so this should be treated as a lead to follow up (for example, what do regular share account holders feel is missing?), not as a firm conclusion.
+
+## H2: Why a paired-samples *t*-test?
+
+- **The same member answers both questions** (Q8r and Q30), so the two scores are linked within each person. They are not two independent groups.
+- The test works on each member's **difference score** (Q8r − Q30) and asks whether the average difference is different from zero.
+- Both variables are treated as interval, 1–5 scales. Only members who answered both questions are included (*n* = `r n2`; `r n_excluded` members with no Q8r answer were excluded).
+
+## H2: Two views of the loan rates
+
+```{r h2-table}
+data.frame(
+  Variable = c("Opinion on loan rates charged (Q8r; 1 = very low, 5 = very high)",
+               "Agree CU loan rates are lower than others (Q30; 1–5)"),
+  n = n2,
+  Mean = c(f2(mean(h2$loan_rate_op)), f2(mean(h2$loan_rate_lower))),
+  SD = c(f2(sd(h2$loan_rate_op)), f2(sd(h2$loan_rate_lower)))
+) |>
+  kable(align = "lccc")
+```
+
+On average, members see the loan rates as **about average** (Q8r *M* = `r f2(mean(h2$loan_rate_op))`) and are **uncertain** whether those rates are lower than at other institutions (Q30 *M* = `r f2(mean(h2$loan_rate_lower))`). The two averages are almost identical.
+
+## H2: The difference is essentially zero
+
+```{r h2-plot}
+#| fig-width: 8
+#| fig-height: 4.4
+dd <- as.data.frame(table(Difference = diffs))
+dd$Difference <- as.numeric(as.character(dd$Difference))
+ggplot(dd, aes(Difference, Freq)) +
+  geom_col(fill = "#2F6F9F", width = .7) +
+  geom_vline(xintercept = mean(diffs), colour = "#D9843F", linewidth = 1) +
+  scale_x_continuous(breaks = seq(-4, 4, 1)) +
+  labs(x = "Difference score (Q8r − Q30)", y = "Number of members",
+       caption = "Orange line = mean difference") +
+  theme_minimal(base_size = 17)
+```
+
+## H2: Do the two opinions differ?
+
+No. Members' average opinion of the loan rates does not differ from their average agreement that the rates are lower than competitors' (*t*(`r tt$parameter`) = `r f2(tt$statistic)`, `r pf(tt$p.value)`). The mean difference is `r f2(tt$estimate)` scale points (95% CI [`r f2(tt$conf.int[1])`, `r f2(tt$conf.int[2])`]), a negligible effect (*d*~z~ = `r f2(dz)`).
+
+- `r sum(diffs > 0)` members rated Q8r higher, `r sum(diffs < 0)` rated Q30 higher, and `r sum(diffs == 0)` gave identical answers.
+- Checks: difference scores are not normal (Shapiro–Wilk `r pf(shap2$p.value)`), but the Wilcoxon signed-rank test agrees (`r pf(wil$p.value)`).
+
+## H2: Conclusion
+
+**H2 is supported**: there is no detectable difference between the two opinions.
+
+- The two scores are **negatively correlated** (*r* = `r f2(r_pair)`). Members who think the rates are high tend to disagree that they are lower than elsewhere, which is consistent. The paired test only compares the *averages*, which happen to match.
+- Failing to find a difference does not prove there is none. The confidence interval shows any true difference is likely smaller than about `r f1(max(abs(tt$conf.int)))` scale points.
+- The two questions use different anchors (very low–very high versus disagree–agree), so the equal averages should be read loosely.
+
+## Summary of results {.smaller}
+
+| Hypothesis | Test | Result | Conclusion |
+|---|---|---|---|
+| H1 | One-way ANOVA | *F*(`r dfb`, `r dfw`) = `r f2(F1)`, `r pf(p1)`, η² = `r f2(eta2)` | Supported. Users of the regular share account are less positive than the other two groups |
+| H2 | Paired-samples *t*-test | *t*(`r tt$parameter`) = `r f2(tt$statistic)`, `r pf(tt$p.value)`, *d*~z~ = `r f2(dz)` | Supported. No difference between the two loan-rate opinions |
+
+## Appendix {.smaller}
+
+**Links**
+
+- GitHub repository: <https://github.com/espinacecilia-design/6500/tree/main/IC10-case31>
+- GitHub Pages (published report): <https://espinacecilia-design.github.io/6500/IC10-case31/IC_Case31_H1-H2_Summary_Cecilia_Espina.html>
+
+**Notes on method**
+
+- Data: cleaned SPSS file `Case31_Data_efcu_4.sav` (N = `r n_total`); recoded variables Q13r and Q8r follow the Module 10 data preparation. "No opinion" / blank answers are system-missing in Q8r (`r n_excluded` members), so H2 uses the `r n2` members who answered both Q8r and Q30.
+- Likert items (Q33, Q8r, Q30) are treated as interval scales, as in the Data Analysis Table. Effect sizes: η² (H1) and Cohen's *d*~z~ (H2).
+- H1 post hoc comparisons use Tukey's HSD. Robustness checks: Levene's test (median-centered), Welch's ANOVA, Kruskal–Wallis, and the Wilcoxon signed-rank test for H2.
+- Analysis in R (`aov`, `TukeyHSD`, `t.test`, `car::leveneTest`); the numbers on these slides are calculated from the data when the file is rendered.
