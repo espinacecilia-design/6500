@@ -1,0 +1,296 @@
+---
+title: "Case 31 – Employees Federal Credit Union"
+subtitle: "Reliability and Factor Analysis for the R3 and R6 Scales"
+author: "Cecilia Espina"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+    theme: cosmo
+    fig-align: center
+    include-in-header:
+      - text: |
+          <style>
+            .insight { background: #f3f7fb; border-left: 6px solid #2F6F9F; padding: .4em 1em; margin: 1em 0; }
+            table { font-size: .9em; }
+          </style>
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+suppressPackageStartupMessages({
+  library(haven); library(dplyr); library(tibble); library(ggplot2); library(knitr)
+  library(psych)       # KMO(), cortest.bartlett(), principal(), alpha()
+})
+
+# ---- Data: cleaned SPSS file; keep it in the same folder as this QMD ----
+sav_file <- c("Case31_Data_efcu_4.sav", "Case 31 Data_efcu_4.sav")
+sav_file <- sav_file[file.exists(sav_file)][1]
+if (is.na(sav_file)) stop("Put the Case 31 .sav file in the same folder as this QMD.")
+efcu <- read_sav(sav_file, user_na = TRUE) |>
+  mutate(across(where(is.labelled), as.numeric))
+d <- efcu |> select(q3, q4, q5, q6, q31, q32, q33, q34)
+
+# ---- Helpers ----
+f2   <- function(x) sprintf("%.2f", x)
+pf   <- function(p) ifelse(p < .001, "*p* < .001", paste0("*p* = ", sub("^0", "", sprintf("%.3f", p))))
+pcol <- function(p) ifelse(p < .001, "< .001", sub("^0", "", sprintf("%.3f", p)))
+lab <- c(q3 = "Q3 Courteous", q4 = "Q4 Helpful", q5 = "Q5 Professional", q6 = "Q6 Always available",
+         q31 = "Q31 Keeps information confidential",
+         q32 = "Q32 Prompt in processing loan applications",
+         q33 = "Q33 Services meet members' needs",
+         q34 = "Q34 Loan applications simple and easy")
+
+# ---- One call runs every check for a set of items ----
+analyze <- function(items) {
+  X <- na.omit(d[items]); R <- cor(X); n <- nrow(X)
+  ev <- eigen(R)$values; k <- sum(ev > 1)                 # Kaiser criterion
+  list(items = items, X = X, R = R, n = n, ev = ev, k = k,
+       kmo   = KMO(R),                                    # sampling adequacy
+       bart  = cortest.bartlett(R, n = n),                # Bartlett's test of sphericity
+       pc1   = principal(R, nfactors = 1, rotate = "none", n.obs = n),
+       pck   = principal(R, nfactors = k, rotate = if (k > 1) "varimax" else "none", n.obs = n),
+       alpha = alpha(X, check.keys = FALSE, warnings = FALSE))
+}
+sc <- list(r3  = analyze(c("q3", "q4", "q5", "q6")),
+           r6  = analyze(c("q31", "q32", "q33", "q34")),
+           all = analyze(c("q3", "q4", "q5", "q6", "q31", "q32", "q33", "q34")))
+
+# ---- Table / figure builders ----
+desc_tbl <- function(s) tibble(Item = lab[s$items], n = s$n, Mean = f2(colMeans(s$X)),
+  SD = f2(apply(s$X, 2, sd)), Min = apply(s$X, 2, min), Max = apply(s$X, 2, max))
+cor_tbl <- function(s) { m <- matrix(f2(s$R), nrow(s$R)); m[upper.tri(m)] <- ""
+  colnames(m) <- toupper(s$items); cbind(Item = lab[s$items], as.data.frame(m)) }
+suit_tbl <- function(s) tibble(
+  Measure = c("KMO (overall)", paste0("MSA: ", toupper(s$items)), "Bartlett's χ²", "df", "p"),
+  Value   = c(f2(s$kmo$MSA), f2(s$kmo$MSAi), f2(s$bart$chisq), s$bart$df, pcol(s$bart$p.value)))
+eig_tbl <- function(s) tibble(Component = seq_along(s$ev), Eigenvalue = f2(s$ev),
+  `% of variance` = sprintf("%.1f%%", 100 * s$ev / length(s$ev)),
+  `Cumulative %`  = sprintf("%.1f%%", 100 * cumsum(s$ev) / length(s$ev)))
+scree_plot <- function(s) ggplot(tibble(comp = seq_along(s$ev), ev = s$ev), aes(comp, ev)) +
+  geom_hline(yintercept = 1, linetype = "dashed", colour = "#D9843F") +
+  geom_line(colour = "#2F6F9F", linewidth = 1) + geom_point(colour = "#2F6F9F", size = 3) +
+  annotate("text", x = length(s$ev), y = 1.08, label = "Kaiser criterion (eigenvalue = 1)",
+           hjust = 1, colour = "#D9843F", size = 3.6) +
+  scale_x_continuous(breaks = seq_along(s$ev)) + expand_limits(y = 0) +
+  labs(x = "Component", y = "Eigenvalue") + theme_minimal(base_size = 14)
+load1_tbl <- function(s) tibble(Item = lab[s$items], Loading = f2(s$pc1$loadings[, 1]),
+  `Communality (h²)` = f2(s$pc1$communality), Uniqueness = f2(1 - s$pc1$communality))
+bold <- function(x) ifelse(abs(x) >= .4, paste0("**", f2(x), "**"), f2(x))
+rot_tbl <- function(s) { L <- unclass(s$pck$loadings)
+  out <- tibble(Item = lab[s$items])
+  for (j in seq_len(ncol(L))) out[[paste("Component", j)]] <- bold(L[, j])
+  out$Communality <- f2(s$pck$communality); out }
+alpha_tbl <- function(s) { a <- s$alpha
+  bind_rows(tibble(Item = lab[s$items], `Corrected item–total r` = f2(a$item.stats$r.drop),
+                   `α if item deleted` = f2(a$alpha.drop$raw_alpha)),
+            tibble(Item = "**Scale (all items)**", `Corrected item–total r` = paste0("α = ", f2(a$total$raw_alpha)),
+                   `α if item deleted` = paste0("avg. r = ", f2(a$total$average_r)))) }
+```
+
+# Overview
+
+This report checks whether the two multi-item scales in Case 31 are **valid** (factor analysis) and **reliable** (Cronbach's α), and what that means for the next step: whether to combine the items into a **composite scale**. It does not address the research questions themselves (that comes later).
+
+| Scale | Research question | Items |
+|:--|:--|:--|
+| Attitude toward employee proficiency | R3 | Q3–Q6 |
+| Attitude toward operational effectiveness | R6 | Q31–Q34 |
+
+**Decision rules used** (common benchmarks)
+
+| Check | Question it answers | Benchmark |
+|:--|:--|:--|
+| Kaiser–Meyer–Olkin (KMO) | Are the items correlated enough to factor? | ≥ .60 preferred (.50 minimum) |
+| Bartlett's test of sphericity | Is the correlation matrix different from "no correlations"? | *p* < .05 |
+| Number of factors (Kaiser criterion, scree plot) | Do the items form one dimension? **One** factor is expected for one construct | Only one eigenvalue > 1 |
+| Loadings and communalities | Does each item measure the factor (convergent validity)? | Loading ≥ .50; communality ≥ .50 |
+| Cronbach's α | Are the items internally consistent (reliability)? | α ≥ .70 |
+| Corrected item–total correlation | Does each item fit with the rest? | ≥ .30 |
+
+Factor analysis uses principal components extraction, and components are rotated (varimax) only when more than one has an eigenvalue above 1. Only if a scale shows both validity and reliability is a composite (the mean of its items) justified.
+
+# R3 · Attitude toward employee proficiency
+
+## R3 · Descriptive statistics and correlations
+
+The attitude toward employee proficiency scale has four items (Q3 courteous, Q4 helpful, Q5 professional, Q6 always available), each rated from 1 (strongly disagree) to 5 (strongly agree) by `r nrow(d)` members (@tbl-r3-desc). Factor analysis starts from the correlations among the items (@tbl-r3-cor), which range from `r f2(min(sc$r3$R[lower.tri(sc$r3$R)]))` to `r f2(max(sc$r3$R[lower.tri(sc$r3$R)]))`.
+
+```{r}
+#| label: tbl-r3-desc
+#| tbl-cap: "Attitude toward employee proficiency: item descriptive statistics"
+desc_tbl(sc$r3) |> kable(align = "lccccc")
+```
+
+```{r}
+#| label: tbl-r3-cor
+#| tbl-cap: "Correlations among the items (Pearson r)"
+cor_tbl(sc$r3) |> kable(align = "lcccc")
+```
+
+## R3 · Factor analysis
+
+**Is the data suitable?** Yes. The KMO measure is `r f2(sc$r3$kmo$MSA)`, above the .60 benchmark, and Bartlett's test is significant (`r sprintf("χ²(%d) = %s, %s", sc$r3$bart$df, f2(sc$r3$bart$chisq), pf(sc$r3$bart$p.value))`), so the items share enough variance to be factored (@tbl-r3-suit).
+
+```{r}
+#| label: tbl-r3-suit
+#| tbl-cap: "R3: KMO measure of sampling adequacy (MSA) and Bartlett's test"
+suit_tbl(sc$r3) |> kable(align = "lc")
+```
+
+**How many factors?** Only `r sc$r3$k` component has an eigenvalue above 1. The first has an eigenvalue of `r f2(sc$r3$ev[1])` (explaining `r sprintf("%.0f%%", 100 * sc$r3$ev[1] / length(sc$r3$items))` of the variance) and the next is only `r f2(sc$r3$ev[2])` (@tbl-r3-eig). The scree plot shows a sharp drop after the first component (@fig-r3-scree). This is the **single factor** we expect from one construct.
+
+```{r}
+#| label: tbl-r3-eig
+#| tbl-cap: "R3: eigenvalues and variance explained"
+eig_tbl(sc$r3) |> kable(align = "cccc")
+```
+
+```{r}
+#| label: fig-r3-scree
+#| fig-cap: "R3: scree plot"
+#| fig-width: 6.5
+#| fig-height: 3.6
+#| out-width: 70%
+scree_plot(sc$r3)
+```
+
+**Do the items measure that factor?** Yes. All loadings are high (`r sprintf("%.2f–%.2f", min(sc$r3$pc1$loadings[, 1]), max(sc$r3$pc1$loadings[, 1]))`) and all communalities (`r sprintf("%.2f–%.2f", min(sc$r3$pc1$communality), max(sc$r3$pc1$communality))`) are above .50, so each item shares most of its variance with the common factor (@tbl-r3-load). This supports **convergent validity**.
+
+```{r}
+#| label: tbl-r3-load
+#| tbl-cap: "R3: loadings and communalities (one-component solution)"
+load1_tbl(sc$r3) |> kable(align = "lccc")
+```
+
+## R3 · Reliability analysis
+
+Cronbach's α is **`r f2(sc$r3$alpha$total$raw_alpha)`**, above the .70 benchmark, with an average inter-item correlation of `r f2(sc$r3$alpha$total$average_r)`. Every item correlates well with the rest of the scale (corrected item–total *r* of `r sprintf("%.2f–%.2f", min(sc$r3$alpha$item.stats$r.drop), max(sc$r3$alpha$item.stats$r.drop))`, all above .30), and deleting any item would not raise α (the highest α-if-deleted is `r f2(max(sc$r3$alpha$alpha.drop$raw_alpha))`) (@tbl-r3-alpha).
+
+```{r}
+#| label: tbl-r3-alpha
+#| tbl-cap: "R3: reliability analysis (Cronbach's α)"
+alpha_tbl(sc$r3) |> kable(align = "lcc")
+```
+
+## R3 · Conclusion and next step
+
+::: {.insight}
+The scale shows **one clear factor**, strong communalities and **high reliability** (α = `r f2(sc$r3$alpha$total$raw_alpha)`). **Decision: create a composite.** In the later analysis for R3, use the **mean of Q3–Q6** as the employee proficiency index instead of analyzing the four items separately.
+:::
+
+# R6 · Attitude toward operational effectiveness
+
+## R6 · Descriptive statistics and correlations
+
+The attitude toward operational effectiveness scale has four items (Q31 keeps information confidential, Q32 prompt loan processing, Q33 services meet needs, Q34 simple applications), each rated from 1 (strongly disagree) to 5 (strongly agree) by `r nrow(d)` members (@tbl-r6-desc). Factor analysis starts from the correlations among the items (@tbl-r6-cor), which range from `r f2(min(sc$r6$R[lower.tri(sc$r6$R)]))` to `r f2(max(sc$r6$R[lower.tri(sc$r6$R)]))`.
+
+```{r}
+#| label: tbl-r6-desc
+#| tbl-cap: "Attitude toward operational effectiveness: item descriptive statistics"
+desc_tbl(sc$r6) |> kable(align = "lccccc")
+```
+
+```{r}
+#| label: tbl-r6-cor
+#| tbl-cap: "Correlations among the items (Pearson r)"
+cor_tbl(sc$r6) |> kable(align = "lcccc")
+```
+
+## R6 · Factor analysis
+
+**Is the data suitable?** Only marginally. Bartlett's test is significant (`r sprintf("χ²(%d) = %s, %s", sc$r6$bart$df, f2(sc$r6$bart$chisq), pf(sc$r6$bart$p.value))`), so some correlation exists, but the correlations are small and the KMO measure is `r f2(sc$r6$kmo$MSA)`, right at the lowest acceptable value (.50), with several item-level values at or below it (@tbl-r6-suit). The items share little common variance.
+
+```{r}
+#| label: tbl-r6-suit
+#| tbl-cap: "R6: KMO measure of sampling adequacy (MSA) and Bartlett's test"
+suit_tbl(sc$r6) |> kable(align = "lc")
+```
+
+**How many factors?** Not one. `r sc$r6$k` components have eigenvalues above 1 (`r f2(sc$r6$ev[1])` and `r f2(sc$r6$ev[2])`), and the first explains only `r sprintf("%.0f%%", 100 * sc$r6$ev[1] / length(sc$r6$items))` of the variance (@tbl-r6-eig and @fig-r6-scree). We expect a single factor for one construct, so the items do **not** form one dimension.
+
+```{r}
+#| label: tbl-r6-eig
+#| tbl-cap: "R6: eigenvalues and variance explained"
+eig_tbl(sc$r6) |> kable(align = "cccc")
+```
+
+```{r}
+#| label: fig-r6-scree
+#| fig-cap: "R6: scree plot"
+#| fig-width: 6.5
+#| fig-height: 3.6
+#| out-width: 70%
+scree_plot(sc$r6)
+```
+
+**Do the items measure one factor?** No. If forced into one component, the loadings are `r sprintf("%.2f–%.2f", min(sc$r6$pc1$loadings[, 1]), max(sc$r6$pc1$loadings[, 1]))` and the communalities `r sprintf("%.2f–%.2f", min(sc$r6$pc1$communality), max(sc$r6$pc1$communality))`; only one item reaches .50 (@tbl-r6-load). The rotated two-component solution splits the items: Q32 (prompt processing) and Q34 (simple applications) group together, while Q31 (confidentiality) and Q33 (meets needs) group together, with Q32 also cross-loading on the other component (@tbl-r6-rot; loadings of .40 or more in bold). The items therefore do not show **convergent validity** as one scale.
+
+```{r}
+#| label: tbl-r6-load
+#| tbl-cap: "R6: loadings and communalities (one-component solution)"
+load1_tbl(sc$r6) |> kable(align = "lccc")
+```
+
+```{r}
+#| label: tbl-r6-rot
+#| tbl-cap: "R6: rotated components (varimax; Kaiser criterion)"
+rot_tbl(sc$r6) |> kable(align = "lccc")
+```
+
+## R6 · Reliability analysis
+
+Cronbach's α is only **`r f2(sc$r6$alpha$total$raw_alpha)`**, well below the .70 benchmark, and the average inter-item correlation is `r f2(sc$r6$alpha$total$average_r)`. The corrected item–total correlations (`r sprintf("%.2f–%.2f", min(sc$r6$alpha$item.stats$r.drop), max(sc$r6$alpha$item.stats$r.drop))`) are below .30 for most items, and no deletion helps (the highest α-if-deleted is `r f2(max(sc$r6$alpha$alpha.drop$raw_alpha))`) (@tbl-r6-alpha). The items are **not internally consistent**.
+
+```{r}
+#| label: tbl-r6-alpha
+#| tbl-cap: "R6: reliability analysis (Cronbach's α)"
+alpha_tbl(sc$r6) |> kable(align = "lcc")
+```
+
+## R6 · Conclusion and next step
+
+::: {.insight}
+Q31–Q34 do **not** form one factor and are **not reliable** as a sum (α = `r f2(sc$r6$alpha$total$raw_alpha)`). **Decision: do not create a composite.** In the later analysis for R6, analyze **each of Q31, Q32, Q33 and Q34 as its own variable.**
+:::
+
+# Discriminant validity: both scales together
+
+Discriminant validity asks whether the items load on the construct they are meant to represent and not on the other one. With all eight items together, Bartlett's test is significant (`r sprintf("χ²(%d) = %s, %s", sc$all$bart$df, f2(sc$all$bart$chisq), pf(sc$all$bart$p.value))`) and the KMO measure is `r f2(sc$all$kmo$MSA)`. `r sc$all$k` components have eigenvalues above 1 (`r f2(sc$all$ev[1])` and `r f2(sc$all$ev[2])`) (@tbl-all-rot).
+
+The four employee items (Q3–Q6) load strongly on one component, so that construct is distinct. The R6 items do not separate cleanly: Q32 and Q34 load on the second component, but Q31 and Q33 have low communalities and no clear home. This agrees with the earlier results: the employee scale is a valid construct, while the operational effectiveness items are not a coherent scale.
+
+```{r}
+#| label: tbl-all-rot
+#| tbl-cap: "Both scales together: rotated components (varimax; loadings of .40 or more in bold)"
+rot_tbl(sc$all) |> kable(align = "lccc")
+```
+
+# Summary and decision
+
+| Scale | Factors (eigenvalue > 1) | KMO | One-component communalities | Cronbach's α | **Decision** |
+|:--|:-:|:-:|:-:|:-:|:--|
+| R3 Employee proficiency (Q3–Q6) | `r sc$r3$k` | `r f2(sc$r3$kmo$MSA)` | `r sprintf("%.2f–%.2f", min(sc$r3$pc1$communality), max(sc$r3$pc1$communality))` | `r f2(sc$r3$alpha$total$raw_alpha)` | **Create a composite** (mean of Q3–Q6) |
+| R6 Operational effectiveness (Q31–Q34) | `r sc$r6$k` | `r f2(sc$r6$kmo$MSA)` | `r sprintf("%.2f–%.2f", min(sc$r6$pc1$communality), max(sc$r6$pc1$communality))` | `r f2(sc$r6$alpha$total$raw_alpha)` | **No composite**; analyze Q31–Q34 individually |
+
+# Appendix {.unnumbered}
+
+**Links**
+
+- GitHub repository: <https://github.com/espinacecilia-design/6500/tree/main/IC10-case31>
+- GitHub Pages (published report): <https://espinacecilia-design.github.io/6500/IC10-case31/IC_Case31_Reliability-FactorAnalysis_Cecilia_Espina.html>
+
+**Notes on method**
+
+- Data: cleaned SPSS file, N = `r nrow(d)` (no missing values on these eight items).
+- Packages: `psych` (`KMO()`, `cortest.bartlett()`, `principal()`, `alpha()`). Install once with `install.packages("psych")`.
+- Extraction: principal components. Components with eigenvalues above 1 are kept (Kaiser criterion) and rotated with varimax when there is more than one.
+- Reliability: raw Cronbach's α, corrected item–total correlations (`r.drop`) and α if item deleted.
