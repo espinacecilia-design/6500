@@ -1,0 +1,190 @@
+---
+title: "Case 31 (EFCU): Summary of Data Analysis for H5a-H5d"
+subtitle: "Multiple regression: what drives attitude toward operational efficiency?"
+author: "Cecilia Espina"
+date: today
+format:
+  revealjs:
+    theme: simple
+    slide-number: true
+    embed-resources: true
+    code-overflow: wrap
+    css: custom.css
+    width: 1280
+    height: 720
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# 1. Setup
+
+## Packages and data
+
+```{r}
+library(haven)
+library(tidyverse)
+library(broom)
+library(car)       # VIF
+library(knitr)
+
+efcu <- read_sav("Case31 Data_efcu_4.sav")   # cleaned data (n = 128)
+```
+
+- Cleaned SPSS file, 128 respondents. Q37 "No Opinion" (6) was already recoded to missing in `Q37_r`, so 7 respondents drop out of the model.
+
+## Variables (from the Data Analysis Table)
+
+| Role | Variable | Measure |
+|:--|:--|:--|
+| **DV** | `Q37_r` | Overall rating of credit union management & operation (reverse-coded: 1 = Very Poor ... 5 = Excellent) |
+| H5a IV | `q31` | CU personnel keep my financial info confidential (1-5 agree) |
+| H5b IV | `q32` | CU is prompt in processing loan applications (1-5 agree) |
+| H5c IV | `q33` | CU's financial services meet members' needs (1-5 agree) |
+| H5d IV | `q34` | CU loan applications are simple and easy to complete (1-5 agree) |
+
+```{r}
+dv  <- "Q37_r"
+ivs <- c("q31", "q32", "q33", "q34")
+```
+
+# 2. Why multiple regression?
+
+## Rationale
+
+- All four hypotheses have the **same dependent variable** (overall attitude toward operational efficiency).
+- The DV and all four IVs are **interval-scaled** (5-point rating scales treated as interval).
+- Each hypothesis predicts a **directional (positive) effect** of one IV on the DV.
+- Multiple regression tests all four at once and estimates each IV's effect **holding the other three constant**. Four separate simple regressions would ignore that the IVs overlap (e.g., prompt processing and easy applications are correlated, r = .40).
+- Each hypothesis is judged by its own **slope (t-test)**; the whole model by the **F-test** and **R²**.
+
+# 3. Analysis
+
+## The model {.smaller}
+
+```{r}
+m <- lm(Q37_r ~ q31 + q32 + q33 + q34, data = efcu)
+summary(m)
+```
+
+## Coefficients (with standardized betas)
+
+```{r}
+mf  <- model.frame(m)
+beta <- coef(lm(scale(Q37_r) ~ scale(q31) + scale(q32) + scale(q33) + scale(q34), data = mf))[-1]
+
+co <- tidy(m, conf.int = TRUE) |>
+  filter(term != "(Intercept)") |>
+  mutate(beta = beta, hypothesis = c("H5a", "H5b", "H5c", "H5d"))
+
+co |>
+  transmute(hypothesis, term,
+            b = round(estimate, 3), SE = round(std.error, 3), beta = round(beta, 3),
+            t = round(statistic, 2),
+            p = ifelse(p.value < .001, "< .001", sprintf("%.3f", p.value)),
+            `95% CI` = sprintf("[%.2f, %.2f]", conf.low, conf.high)) |>
+  kable()
+```
+
+## Model fit
+
+```{r}
+g <- glance(m)
+g |>
+  select(r.squared, adj.r.squared, statistic, df, df.residual, p.value, nobs) |>
+  mutate(across(where(is.numeric), \(x) round(x, 3))) |>
+  kable()
+```
+
+```{r}
+#| echo: false
+fmt_p <- function(p) if (p < .001) "p < .001" else sprintf("p = %.3f", p)
+st <- function(term) {
+  r <- co[co$term == term, ]
+  sprintf("b = %.2f, &beta; = %.2f, t(%d) = %.2f, %s",
+          r$estimate, r$beta, g$df.residual, r$statistic, fmt_p(r$p.value))
+}
+```
+
+## Assumption checks: tests
+
+```{r}
+vif(m)                                   # all well below 5: no multicollinearity problem
+lmtest::bptest(m)                        # constant variance
+shapiro.test(resid(m))                   # normality of residuals
+```
+
+- **Multicollinearity:** VIF = 1.07-1.40, no concern.
+- **Constant variance:** Breusch-Pagan is not significant (p = .33).
+- **Normality:** Shapiro-Wilk flags mild non-normality (p < .001), driven by a few low outliers on a 5-point DV. With n = 121, slope tests are fairly robust to this, but read the results as approximate.
+
+## Assumption checks: residual plots
+
+```{r}
+#| fig-height: 4.2
+#| fig-width: 10
+par(mfrow = c(1, 2)); plot(m, which = 1:2); par(mfrow = c(1, 1))
+```
+
+# 4. Results by hypothesis
+
+## H5a: Confidentiality &rarr; efficiency attitude
+
+**Hypothesis:** Members' belief that the CU keeps personal financial information confidential positively influences their overall attitude toward the CU's operational efficiency.
+
+**Insight: Supported.** Members who more strongly agree that EFCU keeps their financial information confidential rate its management and operations higher, even after controlling for the other three drivers. (`r st("q31")`)
+
+## H5b: Loan processing promptness &rarr; efficiency attitude
+
+**Hypothesis:** Loan application processing promptness positively influences overall attitude toward operational efficiency.
+
+**Insight: Supported, and the strongest driver.** Members who see EFCU as prompt in processing loan applications give it a better overall efficiency rating. (`r st("q32")`)
+
+## H5c: Meeting members' needs &rarr; efficiency attitude
+
+**Hypothesis:** Member satisfaction with how well financial services meet their needs positively influences overall attitude toward operational efficiency.
+
+**Insight: Supported.** Members who feel EFCU's services meet their needs rate its overall efficiency higher, nearly as strongly as promptness. (`r st("q33")`)
+
+## H5d: Application simplicity &rarr; efficiency attitude
+
+**Hypothesis:** Loan application simplicity and easiness positively influences overall attitude toward operational efficiency.
+
+**Insight: Not supported.** Once confidentiality, promptness, and service adequacy are held constant, how easy the loan application is has no significant effect on the overall efficiency rating (the estimate is near zero and slightly negative, not the predicted positive direction). (`r st("q34")`)
+
+*Likely reason:* ease of application overlaps with promptness (r = .40), and on its own `q34` is barely related to the DV (r = .08).
+
+## Overall model
+
+```{r}
+#| echo: false
+#| output: asis
+cat(sprintf("**R&sup2; = %.3f, adjusted R&sup2; = %.3f, F(%d, %d) = %.2f, %s, n = %d**",
+            g$r.squared, g$adj.r.squared, g$df, g$df.residual, g$statistic,
+            fmt_p(g$p.value), g$nobs))
+```
+
+- The four predictors together explain about **30%** of the variance in overall efficiency attitude, a significant model.
+- By standardized beta: **promptness (.34) > meeting needs (.27) > confidentiality (.18) > simplicity (-.07, n.s.)**.
+- About 70% of the variance is unexplained, so other factors (e.g., rates, employee proficiency) also shape the overall rating.
+
+## Summary table
+
+| Hypothesis | Driver | Result |
+|:--|:--|:--|
+| H5a | Confidentiality of personal financial info | **Supported** |
+| H5b | Loan application processing promptness | **Supported** |
+| H5c | Services meeting members' needs | **Supported** |
+| H5d | Simplicity of loan application | **Not supported** |
+
+## Takeaway for EFCU
+
+To improve members' perception of its operational efficiency, EFCU should prioritize **faster loan processing** and **services that match member needs**, while continuing to protect confidentiality. Simplifying the loan application is worthwhile, but it is not an independent lever on the overall efficiency rating.
+
+# Appendix
+
+## Links
+
+- GitHub repo: <https://github.com/YOUR-USERNAME/YOUR-REPO>   <!-- EDIT: paste your repo link -->
+- GitHub Pages: <https://YOUR-USERNAME.github.io/YOUR-REPO/Case31_H5a-H5d_Espina.html>   <!-- EDIT: paste your Pages link -->
