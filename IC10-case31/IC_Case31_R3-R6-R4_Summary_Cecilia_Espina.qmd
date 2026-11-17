@@ -1,0 +1,341 @@
+---
+title: "Case 31 – Employees Federal Credit Union"
+subtitle: "Summary of Data Analysis: R3, R6 and R4a–c"
+author: "Cecilia Espina"
+date: today
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    embed-resources: true
+    theme: cosmo
+    fig-align: center
+    include-in-header:
+      - text: |
+          <style>
+            .insight { background: #f3f7fb; border-left: 6px solid #2F6F9F; padding: .4em 1em; margin: 1em 0; }
+            table { font-size: .9em; }
+          </style>
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+suppressPackageStartupMessages({
+  library(haven); library(dplyr); library(tidyr); library(purrr)
+  library(tibble); library(ggplot2); library(knitr)
+})
+
+# ---- Data: cleaned SPSS file; keep it in the same folder as this QMD ----
+sav_file <- c("Case31_Data_efcu_4.sav", "Case 31 Data_efcu_4.sav")
+sav_file <- sav_file[file.exists(sav_file)][1]
+if (is.na(sav_file)) stop("Put the Case 31 .sav file in the same folder as this QMD.")
+efcu <- read_sav(sav_file, user_na = TRUE) |>
+  mutate(across(where(is.labelled), as.numeric))
+
+d <- efcu |>
+  transmute(q3, q4, q5, q6, q30, q31, q32, q33, q34,
+            q37r = Q37_r, q7r = Q7_r, q8r = Q8_r, q27,
+            loc = q38) |>
+  mutate(emp = rowMeans(across(q3:q6)),          # employee proficiency index (mean of Q3-Q6)
+         grp = factor(loc, 1:2, c("Headquarters area", "Elsewhere")))
+N <- nrow(d)
+
+# ---- Helpers ----
+f2   <- function(x) sprintf("%.2f", x)
+pf   <- function(p) ifelse(p < .001, "*p* < .001", paste0("*p* = ", sub("^0", "", sprintf("%.3f", p))))
+pcol <- function(p) ifelse(p < .001, "< .001", sub("^0", "", sprintf("%.3f", p)))
+pct  <- function(lgl) sprintf("%.0f%%", 100 * mean(lgl))
+alpha <- function(X) { X <- na.omit(X); k <- ncol(X)
+  k / (k - 1) * (1 - sum(apply(X, 2, var)) / var(rowSums(X))) }
+t1_txt <- function(x, mu = 3) { tt <- t.test(x, mu = mu)
+  sprintf("*t*(%d) = %s, %s", as.integer(tt$parameter), f2(tt$statistic), pf(tt$p.value)) }
+tw_txt <- function(v) { tt <- t.test(d[[v]][d$loc == 1], d[[v]][d$loc == 2])   # Welch is R's default
+  sprintf("*t*(%.1f) = %s, %s", tt$parameter, f2(tt$statistic), pf(tt$p.value)) }
+dw <- function(v) { a <- na.omit(d[[v]][d$loc == 1]); b <- na.omit(d[[v]][d$loc == 2])
+  sp <- sqrt(((length(a) - 1) * var(a) + (length(b) - 1) * var(b)) / (length(a) + length(b) - 2))
+  (mean(a) - mean(b)) / sp }
+
+lab <- c(q3 = "Courteous (Q3)", q4 = "Helpful (Q4)", q5 = "Professional (Q5)",
+         q6 = "Always available (Q6)", emp = "Employee proficiency index (mean of Q3–Q6)",
+         q37r = "Overall management & operation (Q37r)",
+         q31 = "Keeps financial information confidential (Q31)",
+         q32 = "Prompt in processing loan applications (Q32)",
+         q33 = "Services meet members' needs (Q33)",
+         q34 = "Loan applications simple and easy (Q34)",
+         q30 = "Loan rates lower than other institutions (Q30)",
+         q8r = "Opinion of loan rates charged (Q8r; 1 = very low, 5 = very high)",
+         q7r = "Opinion of savings rates paid (Q7r; 1 = very low, 5 = very high)")
+
+desc_tbl <- function(vars) map_dfr(vars, \(v) { x <- na.omit(d[[v]])
+  tibble(Item = lab[[v]], n = length(x), Mean = f2(mean(x)), SD = f2(sd(x)),
+         `% Negative (<3)` = pct(x < 3), `% Neutral (3 to <4)` = pct(x >= 3 & x < 4),
+         `% Positive (4–5)` = pct(x >= 4)) })
+
+t1_tbl <- function(vars, mu = 3) map_dfr(vars, \(v) { x <- na.omit(d[[v]]); tt <- t.test(x, mu = mu)
+  tibble(Item = lab[[v]], Mean = f2(mean(x)),
+         `95% CI` = sprintf("[%s, %s]", f2(tt$conf.int[1]), f2(tt$conf.int[2])),
+         t = f2(tt$statistic), df = as.integer(tt$parameter), p = pcol(tt$p.value),
+         `Cohen's d` = f2((mean(x) - mu) / sd(x))) })
+
+welch_tbl <- function(vars) map_dfr(vars, \(v) {
+  a <- na.omit(d[[v]][d$loc == 1]); b <- na.omit(d[[v]][d$loc == 2]); tt <- t.test(a, b)
+  tibble(Item = lab[[v]], `n (HQ / Else)` = paste(length(a), "/", length(b)),
+         `HQ area M (SD)` = sprintf("%.2f (%.2f)", mean(a), sd(a)),
+         `Elsewhere M (SD)` = sprintf("%.2f (%.2f)", mean(b), sd(b)),
+         Difference = f2(mean(a) - mean(b)), `t (Welch)` = f2(tt$statistic),
+         df = sprintf("%.1f", tt$parameter), p = pcol(tt$p.value), `Cohen's d` = f2(dw(v))) })
+
+col_lik <- c(Negative = "#B5532E", Neutral = "#A9A9A9", Positive = "#2F6F9F")
+likert_plot <- function(vars) {
+  map_dfr(vars, \(v) { x <- na.omit(d[[v]])
+    tibble(item = lab[[v]], Negative = mean(x < 3) * 100,
+           Neutral = mean(x >= 3 & x < 4) * 100, Positive = mean(x >= 4) * 100) }) |>
+    pivot_longer(-item, names_to = "resp", values_to = "pct") |>
+    mutate(resp = factor(resp, c("Negative", "Neutral", "Positive")),
+           item = factor(item, rev(lab[vars]))) |>
+    ggplot(aes(pct, item, fill = resp)) +
+    geom_col(width = .65, position = position_stack(reverse = TRUE)) +
+    geom_text(aes(label = ifelse(pct >= 6, sprintf("%.0f%%", pct), "")),
+              position = position_stack(vjust = .5, reverse = TRUE), colour = "white", size = 4) +
+    scale_fill_manual(values = col_lik) + scale_y_discrete(labels = scales::label_wrap(38)) +
+    labs(x = "% of respondents", y = NULL, fill = NULL) +
+    theme_minimal(base_size = 14) + theme(legend.position = "bottom", panel.grid.major.y = element_blank())
+}
+
+col_loc <- c(`Headquarters area` = "#2F6F9F", Elsewhere = "#D9843F")
+means_plot <- function(vars) {
+  map_dfr(vars, \(v) d |> filter(!is.na(.data[[v]])) |> group_by(grp) |>
+            summarise(M = mean(.data[[v]]), se = sd(.data[[v]]) / sqrt(n()), .groups = "drop") |>
+            mutate(item = sub(" \\(.*", "", lab[[v]]))) |>
+    mutate(item = factor(item, rev(unique(item)))) |>
+    ggplot(aes(M, item, colour = grp)) +
+    geom_vline(xintercept = 3, linetype = "dotted", colour = "grey50") +
+    geom_pointrange(aes(xmin = M - 1.96 * se, xmax = M + 1.96 * se),
+                    position = position_dodge(width = .5)) +
+    scale_colour_manual(values = col_loc) + coord_cartesian(xlim = c(2, 5)) +
+    labs(x = "Mean rating (1–5), with 95% CI", y = NULL, colour = NULL) +
+    theme_minimal(base_size = 14) + theme(legend.position = "bottom")
+}
+
+tab_loan <- table(d$loc, d$q27)                      # rows: 1 = HQ area, 2 = elsewhere; cols: 1 = has loan
+cs  <- chisq.test(tab_loan, correct = FALSE)
+csc <- chisq.test(tab_loan)                          # with continuity correction
+```
+
+# Overview
+
+::: {.insight}
+**What this report does.** It answers five research questions about Employees Federal Credit Union (EFCU) members using the cleaned survey file (**`r N` members**; `r sum(d$loc == 1)` live in the headquarters area, `r sum(d$loc == 2)` elsewhere). Each section starts with the descriptive story; test statistics appear only in parentheses.
+:::
+
+<!-- CHECK: R3, R4a-c and R6 below were inferred from the case objectives because the Research
+     Questions table (IC - M08 - Data Analysis Table - Research Questions) was not available.
+     Compare with the instructor's table and edit this table + the section titles if they differ. -->
+
+| # | Research question | Variables | Analysis |
+|:--|:----------------------|:----------------|:----------------------|
+| **R3** | How do members rate the proficiency of credit union employees? | Q3–Q6 (employee index) | Descriptives; one-sample *t*-test vs. neutral (3) |
+| **R6** | How effectively do members think the credit union is operated? | Q30–Q34, Q37r | Descriptives; one-sample *t*-tests vs. neutral (3) |
+| **R4a** | Do members in the headquarters area and elsewhere differ in their views on **borrowing**? | Q8r, Q30, Q27 | Welch *t*-tests; chi-square test of independence |
+| **R4b** | …in their views on the **services** provided? | Q7r, Q31–Q34 | Welch *t*-tests |
+| **R4c** | …in their **overall view of management** and of employees? | Q37r, employee index | Welch *t*-tests |
+
+# R3 · Employee proficiency
+
+## R3 · Descriptive statistics
+
+Members think very highly of the credit union's employees. About nine in ten agree that employees are courteous (`r pct(na.omit(d[["q3"]]) >= 4)`) and helpful (`r pct(na.omit(d[["q4"]]) >= 4)`), and about four in five say they are professional (`r pct(na.omit(d[["q5"]]) >= 4)`) and always available (`r pct(na.omit(d[["q6"]]) >= 4)`). Availability is also the only item where any real disagreement shows up (`r pct(na.omit(d[["q6"]]) < 3)`).
+
+The four items hang together well (Cronbach's α = `r f2(alpha(d[c("q3","q4","q5","q6")]))`), so I averaged them into one **employee proficiency index**. It averages `r f2(mean(d[["emp"]], na.rm = TRUE))` out of 5 (SD = `r f2(sd(d[["emp"]], na.rm = TRUE))`), and `r pct(na.omit(d[["emp"]]) >= 4)` of members have an index of 4 or higher (@tbl-r3-desc and @fig-r3-dist).
+
+```{r}
+#| label: tbl-r3-desc
+#| tbl-cap: "Members' ratings of credit union employees (1 = strongly disagree, 5 = strongly agree)"
+desc_tbl(c("q3", "q4", "q5", "q6", "emp")) |> kable(align = "lccccrr")
+```
+
+```{r}
+#| label: fig-r3-dist
+#| fig-cap: "Share of members who rate employees negatively, neutrally, or positively"
+#| fig-width: 9
+#| fig-height: 4
+#| out-width: 100%
+likert_plot(c("q3", "q4", "q5", "q6", "emp"))
+```
+
+::: {.insight}
+**Insight:** employees are EFCU's clearest strength. Nobody rates the index below neutral, and the only soft spot is availability.
+:::
+
+## R3 · One-sample t-test
+
+Is this more than a polite "neutral"? Yes. Every item and the index sit well above the neutral midpoint of 3 (index: `r t1_txt(d[["emp"]], 3)`; @tbl-r3-t), and the index is even above "agree" (4) (`r t1_txt(d[["emp"]], 4)`). The distance from neutral is large for every item, and smallest for availability (M = `r f2(mean(d[["q6"]], na.rm = TRUE))`).
+
+```{r}
+#| label: tbl-r3-t
+#| tbl-cap: "One-sample t-tests against the neutral midpoint (3)"
+t1_tbl(c("q3", "q4", "q5", "q6", "emp")) |> kable(align = "lccccrc")
+```
+
+# R6 · Effectiveness of operations
+
+## R6 · Descriptive statistics
+
+Members also see the credit union as well run, but less enthusiastically than they see its employees. Overall, `r pct(na.omit(d[["q37r"]]) >= 4)` rate management and operation as good or excellent (M = `r f2(mean(d[["q37r"]], na.rm = TRUE))`; `r sum(!is.na(d[["q37r"]]))` members gave an opinion). Confidentiality is the highest-rated specific item (`r pct(na.omit(d[["q31"]]) >= 4)` agree). Roughly six in ten agree that loan applications are processed promptly (`r pct(na.omit(d[["q32"]]) >= 4)`), that the services meet members' needs (`r pct(na.omit(d[["q33"]]) >= 4)`) and that applications are simple (`r pct(na.omit(d[["q34"]]) >= 4)`), with about a third unsure. The weak spot is pricing: only `r pct(na.omit(d[["q30"]]) >= 4)` agree that EFCU's loan rates are lower than other institutions', `r pct(na.omit(d[["q30"]]) >= 3 & na.omit(d[["q30"]]) < 4)` are unsure and `r pct(na.omit(d[["q30"]]) < 3)` disagree (@tbl-r6-desc and @fig-r6-dist).
+
+The four operations statements (Q31–Q34) are only weakly related (α = `r f2(alpha(d[c("q31","q32","q33","q34")]))`), so I did not combine them into a composite and analyze each item on its own.
+
+```{r}
+#| label: tbl-r6-desc
+#| tbl-cap: "Members' ratings of how the credit union is operated"
+desc_tbl(c("q37r", "q31", "q32", "q33", "q34", "q30")) |> kable(align = "lccccrr")
+```
+
+```{r}
+#| label: fig-r6-dist
+#| fig-cap: "Share of members who rate each aspect of operations negatively, neutrally, or positively"
+#| fig-width: 9
+#| fig-height: 5
+#| out-width: 100%
+likert_plot(c("q37r", "q31", "q32", "q33", "q34", "q30"))
+```
+
+::: {.insight}
+**Insight:** EFCU is seen as well run, but "good" rather than "great". Members trust it with their information; they are far less sure it is cheaper than the competition.
+:::
+
+## R6 · One-sample t-tests
+
+Compared with the neutral midpoint (3), members are positive about the overall management and operation (`r t1_txt(d[["q37r"]], 3)`), confidentiality (`r t1_txt(d[["q31"]], 3)`), prompt processing (`r t1_txt(d[["q32"]], 3)`), meeting needs (`r t1_txt(d[["q33"]], 3)`) and application simplicity (`r t1_txt(d[["q34"]], 3)`) (@tbl-r6-t). The one item that does not differ from neutral is the belief that loan rates are lower than elsewhere (`r t1_txt(d[["q30"]], 3)`): on average members are undecided.
+
+```{r}
+#| label: tbl-r6-t
+#| tbl-cap: "One-sample t-tests against the neutral midpoint (3; for Q37r, 3 = average)"
+t1_tbl(c("q37r", "q31", "q32", "q33", "q34", "q30")) |> kable(align = "lccccrc")
+```
+
+# R4a · Borrowing: headquarters area vs. elsewhere
+
+## R4a · Descriptive statistics
+
+The clearest difference between the two groups is actual borrowing. **`r sprintf("%.0f%%", 100 * prop.table(tab_loan, 1)[1, 1])`** of members in the headquarters area currently have an EFCU loan, compared with **`r sprintf("%.0f%%", 100 * prop.table(tab_loan, 1)[2, 1])`** of members elsewhere (@tbl-r4a-loan and @fig-r4a-loan). Opinions about loan rates are similar: both groups see rates as about average, although headquarters-area members lean slightly lower (Q8r M = `r f2(mean(d[["q8r"]][d$loc == 1], na.rm = TRUE))` vs. `r f2(mean(d[["q8r"]][d$loc == 2], na.rm = TRUE))`) while members elsewhere lean slightly "high". Both groups are unsure whether EFCU's rates beat competitors' (Q30 M = `r f2(mean(d[["q30"]][d$loc == 1], na.rm = TRUE))` vs. `r f2(mean(d[["q30"]][d$loc == 2], na.rm = TRUE))`) (@tbl-r4a-t).
+
+```{r}
+#| label: tbl-r4a-loan
+#| tbl-cap: "Current EFCU loan (Q27) by residence"
+tab_loan |> as.data.frame.matrix() |>
+  transmute(Residence = c("Headquarters area", "Elsewhere"), n = rowSums(tab_loan),
+            `Has an EFCU loan` = sprintf("%d (%.1f%%)", tab_loan[, 1], 100 * prop.table(tab_loan, 1)[, 1]),
+            `No EFCU loan` = sprintf("%d (%.1f%%)", tab_loan[, 2], 100 * prop.table(tab_loan, 1)[, 2])) |>
+  kable(align = "lccc")
+```
+
+```{r}
+#| label: fig-r4a-loan
+#| fig-cap: "Members with a current EFCU loan, by residence"
+#| fig-width: 6.5
+#| fig-height: 3.6
+#| out-width: 100%
+tibble(grp = factor(c("Headquarters area", "Elsewhere"), c("Headquarters area", "Elsewhere")),
+       pct = 100 * prop.table(tab_loan, 1)[, 1]) |>
+  ggplot(aes(grp, pct, fill = grp)) + geom_col(width = .5, show.legend = FALSE) +
+  geom_text(aes(label = sprintf("%.0f%%", pct)), vjust = -.5, size = 5) +
+  scale_fill_manual(values = col_loc) + coord_cartesian(ylim = c(0, 70)) +
+  labs(x = NULL, y = "% with a current EFCU loan") + theme_minimal(base_size = 14)
+```
+
+## R4a · Chi-square test of independence
+
+Members who live near headquarters are less likely to hold an EFCU loan (`r sprintf("χ²(1) = %.2f, %s", cs$statistic, pf(cs$p.value))`). The result is borderline: with a continuity correction *p* = `r sub("^0", "", sprintf("%.3f", csc$p.value))`, and Fisher's exact test gives *p* = `r sub("^0", "", sprintf("%.3f", fisher.test(tab_loan)$p.value))`.
+
+## R4a · Independent-samples t-tests
+
+Opinions about rates do not differ clearly. Headquarters-area members see loan rates as somewhat lower than other members do, a small-to-medium gap that just misses significance (`r tw_txt("q8r")`; *d* = `r f2(dw("q8r"))`), and agreement that EFCU's rates beat competitors' is the same in both groups (`r tw_txt("q30")`) (@tbl-r4a-t). Q8r has `r sum(!is.na(d[["q8r"]]))` answers, because members with no opinion are missing.
+
+```{r}
+#| label: tbl-r4a-t
+#| tbl-cap: "Views on loan rates: headquarters area vs. elsewhere (Welch independent-samples t-tests)"
+welch_tbl(c("q8r", "q30")) |> kable(align = "lcccccccc")
+```
+
+::: {.insight}
+**Insight:** headquarters-area members borrow *less* even though they do not see EFCU's rates as worse (if anything, as slightly lower). Price does not seem to explain the gap, so the next section looks at the application process.
+:::
+
+# R4b · Services: headquarters area vs. elsewhere
+
+## R4b · Descriptive statistics
+
+Views of the services are almost identical in the two groups. Confidentiality, prompt processing, meeting needs and savings rates all differ by less than a fifth of a scale point (@fig-r4b-means). The exception is the ease of loan applications: headquarters-area members rate them lower (Q34 M = `r f2(mean(d[["q34"]][d$loc == 1], na.rm = TRUE))` vs. `r f2(mean(d[["q34"]][d$loc == 2], na.rm = TRUE))`).
+
+```{r}
+#| label: fig-r4b-means
+#| fig-cap: "Mean ratings of services by residence (dotted line = neutral)"
+#| fig-width: 9
+#| fig-height: 4.2
+#| out-width: 100%
+means_plot(c("q7r", "q31", "q32", "q33", "q34"))
+```
+
+## R4b · Independent-samples t-tests
+
+Welch tests agree: only application simplicity differs, with headquarters-area members less likely to find applications simple (`r tw_txt("q34")`; *d* = `r f2(dw("q34"))`). Savings rates (`r tw_txt("q7r")`), confidentiality (`r tw_txt("q31")`), prompt processing (`r tw_txt("q32")`) and meeting needs (`r tw_txt("q33")`) show no difference (@tbl-r4b-t). With five comparisons, a single *p* near .05 should be read cautiously.
+
+```{r}
+#| label: tbl-r4b-t
+#| tbl-cap: "Views on services: headquarters area vs. elsewhere (Welch independent-samples t-tests)"
+welch_tbl(c("q7r", "q31", "q32", "q33", "q34")) |> kable(align = "lcccccccc")
+```
+
+::: {.insight}
+**Insight:** headquarters-area members borrow less *and* find the loan application harder. That is a lead worth testing (a simpler application process aimed at them), not proof that the application is the reason.
+:::
+
+# R4c · Overall management and employees: headquarters area vs. elsewhere
+
+## R4c · Independent-samples t-tests
+
+Overall impressions are the same in both groups. The overall rating of management and operation is `r f2(mean(d[["q37r"]][d$loc == 1], na.rm = TRUE))` in the headquarters area vs. `r f2(mean(d[["q37r"]][d$loc == 2], na.rm = TRUE))` elsewhere (`r tw_txt("q37r")`), and the employee proficiency index is `r f2(mean(d[["emp"]][d$loc == 1], na.rm = TRUE))` vs. `r f2(mean(d[["emp"]][d$loc == 2], na.rm = TRUE))` (`r tw_txt("emp")`) (@tbl-r4c-t). Q37r has `r sum(!is.na(d[["q37r"]]))` answers, because members with no opinion are missing.
+
+```{r}
+#| label: tbl-r4c-t
+#| tbl-cap: "Overall views: headquarters area vs. elsewhere (Welch independent-samples t-tests)"
+welch_tbl(c("q37r", "emp")) |> kable(align = "lcccccccc")
+```
+
+::: {.insight}
+**Insight:** location does not change members' overall verdict. Wherever they live, members think EFCU is well managed and its employees are excellent.
+:::
+
+# Key takeaways
+
+1. **R3 – Employees:** a clear **strength** (index `r f2(mean(d[["emp"]], na.rm = TRUE))` of 5); availability is the only slightly weaker item.
+2. **R6 – Operations:** seen as **well run** (`r pct(na.omit(d[["q37r"]]) >= 4)` good or excellent) and trustworthy with information, but members are **undecided** on whether rates beat the competition.
+3. **R4a – Borrowing:** **`r sprintf("%.0f%%", 100 * prop.table(tab_loan, 1)[1, 1])`** of headquarters-area members hold an EFCU loan vs. **`r sprintf("%.0f%%", 100 * prop.table(tab_loan, 1)[2, 1])`** elsewhere, with no worse opinion of rates.
+4. **R4b – Services:** the two groups agree on everything except the **ease of the loan application**, which headquarters-area members rate lower.
+5. **R4c – Overall:** no difference in overall management or employee ratings.
+
+::: {.insight}
+**Recommendation:** investigate why headquarters-area members borrow less (for example, with a short follow-up on the application experience) and use members' confidence in confidentiality and staff to promote EFCU loans.
+:::
+
+# Appendix {.unnumbered}
+
+**Links**
+
+- GitHub repository: <https://github.com/espinacecilia-design/6500/tree/main/IC10-case31>
+- GitHub Pages (published report): <https://espinacecilia-design.github.io/6500/IC10-case31/IC_Case31_R3-R6-R4_Summary_Cecilia_Espina.html>
+
+**Notes on method**
+
+- Data: cleaned SPSS file (N = `r N`). Q7r, Q8r and Q37r follow the Module 10 recoding, where "no opinion" answers are missing and excluded from those analyses.
+- Employee proficiency index = mean of Q3–Q6, computed directly from the four items.
+- Likert items are treated as interval scales, as in the Data Analysis Table. One-sample tests compare each item with the neutral midpoint (3); group comparisons use Welch's *t*-test (unequal variances). Cohen's *d* is the effect size.
+- Cronbach's α was used only to decide whether to form a composite (Q3–Q6: yes; Q31–Q34: no). The factor analysis reported in the earlier activity is not repeated here.
+- No correction for multiple comparisons was applied, so isolated *p* values near .05 should be read cautiously.
