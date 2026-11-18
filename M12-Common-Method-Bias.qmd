@@ -1,0 +1,235 @@
+---
+title: "M12 – Article on Common Method Bias"
+subtitle: "Summary of Podsakoff, MacKenzie & Podsakoff (2012)"
+author: "Cecilia Espina"
+date: 2026-11-18
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+    theme: cosmo
+    code-fold: true
+---
+
+::: {.callout-note}
+## Article reference
+
+Podsakoff, P. M., MacKenzie, S. B., & Podsakoff, N. P. (2012). Sources of method bias in social science research and recommendations on how to control it. *Annual Review of Psychology, 63*, 539–569. <https://doi.org/10.1146/annurev-psych-120710-100452>
+
+**Keywords:** common method variance (CMV), response style biases, marker variable technique, instrumental variable technique, unmeasured latent variable technique
+:::
+
+# Why This Article Matters
+
+- Most survey-based research measures the predictor (X) and the outcome (Y) **with the same method**, usually one self-report questionnaire filled out by one person at one time.
+- When X and Y share a method, part of their correlation may come from **the method, not from a real relationship** between the constructs.
+- This is very common. Bodner (2006) found that **76%** of studies in six areas of psychology used a single measurement method, and **33%** of human-subject studies relied only on self-report questionnaires.
+- Researchers disagree on whether the problem is serious. Some call it an "urban legend" (Spector), while the authors argue the evidence shows it is real and substantial.
+
+**Purpose of the review:** (1) define "method" and "method bias," (2) review the evidence on how big the effects are, (3) evaluate procedural and statistical remedies, and (4) recommend when to worry and what to do.
+
+# Key Definitions
+
+## What is a "method"?
+
+| View | Who | What counts as "method" |
+|---|---|---|
+| **Broad** (the authors' choice) | Campbell & Fiske (1959), Fiske (1982), Edwards (2008) | Rater response tendencies, item wording and structure, item proximity, and the medium, timing, and location of measurement |
+| **Narrow** | Lance et al. (2009, 2010) | Only alternative ways of assigning numbers to observations (item content, structure, format). Excludes rater response styles, occasion, and setting |
+
+The authors choose the **broad** view: whatever you call these factors, they all create **systematic measurement error** that threatens validity.
+
+> Note: what counts as "method" depends on the researcher's intent. Acquiescence is noise in a satisfaction study but the actual construct in a study of response styles.
+
+## What is "method bias"?
+
+Uncontrolled method factors cause **two harmful effects**:
+
+1. **Bias in individual measures (reliability and validity).** Method variance gets mixed in with trait variance, so a scale can look more reliable or convergent than it really is. In regression, error in one predictor can also bias the estimates for *other* predictors.
+2. **Bias in relationships between constructs.** Method bias can **inflate, deflate, or have no effect** on a correlation. As a result it can:
+   - cause Type I or Type II errors in hypothesis tests
+   - misstate how much variance in Y is explained (R²)
+   - make nomological or discriminant validity look better or worse than it really is
+
+::: {.callout-tip}
+## Important exception
+Method bias can **deflate** interaction and quadratic effects, but it **cannot create** them (Evans, 1985; Siemsen et al., 2010).
+:::
+
+## Does it affect all measures equally?
+
+**No.** The evidence supports **unequal effects**:
+
+- Response styles explained 0% to 29% of item variance, depending on the construct (Baumgartner & Steenkamp, 2001).
+- Method variance ranged from 22% to 41% across construct types (Cote & Buckley, 1987).
+- This matters because techniques that assume equal effects (e.g., the correlational marker variable technique) will **overcorrect some measures and undercorrect others**.
+
+# Empirical Evidence: How Big Is the Problem?
+
+## Effect on items (MTMM meta-analyses)
+
+**Table 1 (summarized): variance partitioning in multi-trait multi-method studies**
+
+| Study | Sample | Trait | Method | Error |
+|---|---|---|---|---|
+| Cote & Buckley (1987) | 70 matrices | 42% | 26% | 32% |
+| Williams et al. (1989) | 11 matrices (job perceptions) | 48% | 25% | 21% |
+| Buckley et al. (1990) | 61 matrices | 42% | 22% | 36% |
+| Doty & Glick (1998) | 28 matrices | 46% | 32% | 22% |
+| Lance et al. (2010) | 18 matrices | 40% | 18% | 42% |
+
+**Takeaway:** about **18% to 32%** of the total variance in items comes from **method factors**.
+
+Other item-level predictors of validity and reliability (Scherpenzeel & Saris, 1997): construct type, scale form and length, the item's social desirability, data-collection mode, position in the battery, and the type of information requested.
+
+## Effect on correlations between constructs
+
+The Cote & Buckley (1988) decomposition:
+
+$$
+R_{x,y} = \left(\text{true}R_{t_i,t_j}\sqrt{t_x}\sqrt{t_y}\right) + \left(\text{true}R_{m_k,m_l}\sqrt{m_x}\sqrt{m_y}\right)
+$$
+
+- Applied to Cote & Buckley (1987): trait part = **0.281** and method part = **0.127**, so method bias inflated the correlation by about **45%**.
+- Other estimates of inflation: 38% (Buckley et al., 1990), 60% (Lance et al., 2009), 92% (Doty & Glick, 1998).
+- These estimates are **conservative**. With a single method, the inflation would range from about 94% to 270%.
+
+**Method–method pair technique (Sharma et al., 2009):** this meta-analysis covered 75 samples on the Technology Acceptance Model (TAM). The mean correlation was about **0.16** when the method pair had low susceptibility to bias and about **0.59** when susceptibility was high. About **56%** of between-study variance was due to method bias.
+
+## Effect of specific sources of method bias
+
+**Same source vs. different source (Table 2, summarized).** Corrected correlations are much larger when X and Y come from the same rater:
+
+| Relationship | ρ same source | ρ different source | Ratio |
+|---|---|---|---|
+| Leader behaviors → outcomes | 0.456 | 0.191 | 239% |
+| Personality → job performance | 0.312 | 0.147 | 212% |
+| Job attitudes → OCB | 0.340 | 0.230 | 148% |
+| Participative decision making → work outcomes | 0.343 | 0.165 | 208% |
+| Org. commitment → job performance | 0.183 | 0.138 | 133% |
+| Person-organization fit → job performance | 0.283 | 0.093 | 304% |
+| OCB → performance evaluations | 0.595 | 0.323 | 184% |
+
+*Caveat:* part of this gap may reflect raters' **different perspectives**, not only bias.
+
+**Other specific effects**
+
+| Source | Study | Finding |
+|---|---|---|
+| **Response styles** (acquiescence, disacquiescence, extreme, midpoint, noncontingent) | Baumgartner & Steenkamp (2001), N = 10,477 consumers, 11 countries | Explained **27%** of the variance in correlations among 14 consumer constructs. Correlations were inflated by 54–67% when the signs matched and deflated by 55% (or even flipped sign) when they did not |
+| **Item proximity and reversed items** | Weijters et al. (2009), 76 items, N = 2,850 | Unrelated items: r = .04 when six items apart vs. .09 when adjacent. Same-construct items: .35 vs. .62. **Keep same-construct items at least 6 items apart** |
+| **Item wording** (stress vs. comfort) | Harris & Bladen (1994) | Average r = .21 with the wording bias controlled vs. **.50** without control |
+| **Item context / order** | Harrison et al. (1996) | Fairness–outcome r = .10 in a positive context vs. **.50** in a negative context, from question order alone |
+
+**Bottom line:** the evidence goes against the "urban legend" view. CMV is real and can change substantive conclusions. Editors at major journals treat it as a problem that must be addressed.
+
+# Procedural Remedies (Design Stage)
+
+| Remedy | What to do | Evidence | Limitations |
+|---|---|---|---|
+| **1. Different sources** | Get X from one person and Y from another, or use archival data (company records, annual reports) for one of them | Correlations dropped 49% (0.359 → 0.184). Leadership → effectiveness fell from 0.57 to 0.19 (Lowe et al., 1996) | Not appropriate when both constructs are a person's **own perceptions or attitudes**. Can be costly, archival data may not exist, and split samples lose power |
+| **2a. Temporal separation** | Add a time lag between measuring X and Y | One-month delay: 32% lower correlation. Three-week delay: 43% lower | More complex and costly, risks attrition, other events may intervene, and the right lag is unclear. Assumes the true relationship is stable and that bias fades over time (questionable) |
+| **2b. Proximal separation** | Physically separate the measures in the questionnaire (≥ 6 items apart, use buffer items) | Weijters et al. (2009) | Makes the survey longer (fatigue, lower response rates). Related filler items can create context effects |
+| **2c. Psychological separation** | Use a cover story ("multiple unrelated studies"), embed or camouflage the measure, or make it seem tangential to the study | Widely recommended, but little direct evidence | Only works if the cover story is believable, so **pretest** it |
+| **3. Eliminate common scale properties** | Vary scale type, number of points, anchor labels, and polarity between X and Y | Correlations fell 60% (Kothandapani, 1971), 32% (Arora, 1982), and 15% (Weijters et al., 2010c) | Some format conversions (e.g., to Thurstone or Guttman) change the meaning. **Content validity comes first** |
+| **4. Remove item ambiguity** | Keep items simple, specific, and concise. Define unfamiliar terms. Avoid vague words ("many," "sometimes"), double-barreled items, and double negatives. **Label every scale point** | No direct evidence on correlations | — |
+| **5. Reduce social desirability in wording** | Have judges rate item desirability, or correlate items with a social desirability scale (e.g., Paulhus), then reword | No direct evidence | Hard to reword without hurting content validity. The relationship between endorsement and desirability is often nonlinear |
+| **6. Balance positive and negative items** | Mix positively and negatively worded items to offset acquiescence and disacquiescence | Built-in control: the bias pushes half the items up and half down | Many scales are not balanced, reversed items can change content or confuse people, and it does not fully control bias. **Combine with statistical remedies** |
+
+# Statistical Remedies (Analysis Stage)
+
+| Technique | How it works | Advantages | Disadvantages |
+|---|---|---|---|
+| **Unmeasured latent method factor** (~50 studies) | Add a first-order method factor loaded by all indicators that share the method | No need to measure the source. Models bias at the item level. Allows unequal effects | May absorb **real trait covariance** as well as method variance. Identification problems when there are few indicators. Assumes no method × trait interaction |
+| **Correlation-based marker variable** (Lindell & Whitney, 2001) | Pick a theoretically unrelated marker. Use its **smallest** correlation (r~M~) as the CMV estimate. Partial it out: r* = (r − r~M~) / (1 − r~M~) | **Easy** to use, and widely used | Marker need not share any method features. Assumes bias only inflates. Ignores measurement error. Works at the scale level. Assumes no interaction. Assumes **equal effects** on all variables |
+| **Regression-based marker variable** (Siemsen et al., 2010) | Add marker variable(s) (uncorrelated with the substantive variables but sharing the method bias) to the regression. Use 3–5 if markers correlate modestly | Easy | Same issues as above, plus: it controls only the net shared bias, applies to single-equation models only, it is unclear what is being controlled, and it assumes one method factor |
+| **Instrumental variable (2SLS)** (Antonakis et al., 2010) | Use IVs that are strongly related to the predictor but uncorrelated with the error term. Use at least one more IV than there are endogenous predictors. Run a Sargan overidentification test | Works even when the source of bias is unknown | **Very hard to find good IVs.** Weak IVs can be *more* biased than OLS and inflate Type I error. Gives no insight into the source of the bias |
+| **CFA marker technique** (Williams et al., 2010) | Several markers that share measurement features define a latent method factor. **Phase I:** compare CFA, Baseline, Method-C (equal loadings), Method-U (unequal loadings), and Method-R (constrained correlations). **Phase II:** decompose reliability into trait and method parts. **Phase III:** sensitivity analysis | Item-level, gives a statistical test of bias, and tests equal vs. unequal effects | Does not identify *what* the bias is. The marker factor's meaning is unclear. Results depend on the markers chosen. Fixing parameters can distort standard errors and fit |
+| **Directly measured latent method factor** | Measure the suspected source directly (e.g., **social desirability, negative affectivity**) and let it load on the items | **Clearly identifies the source.** Controls measurement error. Item-level. Allows unequal effects | You must anticipate the source, and a valid measure must exist. Assumes no interaction |
+| **Measured response style technique** (Weijters et al., 2008, 2010) | Insert random, heterogeneous buffer items (at least 3 sets of 5 items) in the same format. Compute ARS, DRS, ERS, and MRS for each set. Model them as latent response-style factors | Specifies the nature of the bias. Uses multiple indicators. Gives stable estimates | Controls only the styles that were measured. Requires extra data collection |
+
+**Response style formulas** (7-point Likert scale; *f(o)* = frequency of option *o*; *k* = number of items in the set):
+
+| Style | Meaning | Formula |
+|---|---|---|
+| **ARS** – acquiescence | Agrees regardless of content | [f(5)×1 + f(6)×2 + f(7)×3] / k |
+| **DRS** – disacquiescence | Disagrees regardless of content | [f(1)×3 + f(2)×2 + f(3)×1] / k |
+| **ERS** – extreme | Uses the endpoints | [f(1) + f(7)] / k |
+| **MRS** – midpoint | Uses the middle | f(4) / k |
+
+# Recommendations
+
+## When is method bias likely to be a problem?
+
+Respondents **satisfice** (give a "good enough" answer) instead of optimizing when the task is hard and their ability or motivation is low (Krosnick, 1999). Satisficing leads to stylistic responding and more method bias.
+
+| Factor | Risk increases when… |
+|---|---|
+| **Ability** | Respondents have low verbal ability or education, are fatigued (late in the survey), have little experience with the topic, or have personality tendencies such as impulsive extroverts (→ ARS), reflective introverts (→ DRS), or rigid, anxious, or ambiguity-intolerant people (→ ERS) |
+| **Motivation** | Questions seem unimportant or have no useful consequences. Participation is forced (e.g., a **course requirement**). The survey is long. Respondents dislike the source. Answers have social consequences (→ social desirability). Respondents are suspicious (→ MRS) or want out (→ careless responding). Respondents hold an **implicit theory** linking X and Y |
+| **Task** | Items are complex or abstract, ambiguous, double-barreled, or have only endpoint labels. Earlier answers are easy to see (paper or online surveys). Items are grouped by construct. All items share the same format, anchors, and no reversed wording |
+
+## What can be done? A step-by-step approach
+
+**Procedural first:**
+
+1. **Match task difficulty to respondent ability.** Don't ask people to "tell more than they can know" (e.g., the motives behind their own behavior).
+2. **Write clear items.** Use simple language, define terms, give examples, avoid double-barreled items, and label every scale point.
+3. **Raise motivation** with a good cover story and instructions: "we value your opinion," anonymity, "there are no right or wrong answers," explain how the data will be used, promise feedback, get senior endorsement, and keep the survey short.
+4. **Make stylistic responding harder:** reverse-word some items (if meaning is kept), separate items to avoid proximity effects, and vary scale types and anchors.
+5. **Use different sources** for X and Y when possible, especially for memory or perception biases and when the construct is not self-referential.
+6. **Otherwise, separate the measures:**
+   - *Temporal* — when the phenomenon is stable, attrition is manageable, and it is feasible
+   - *Methodological* — different scale properties, response modes, or locations
+   - *Psychological* — a cover story or camouflage, ideally combined with a temporal lag long enough to clear short-term memory
+
+**Then statistical:**
+
+```{mermaid}
+flowchart TD
+    A[Method bias still a concern<br/>after procedural remedies?] --> B{Is the source<br/>known and measurable?}
+    B -- "Yes: a specific factor<br/>(e.g., social desirability)" --> C[Directly measured<br/>latent method factor]
+    B -- "Yes: response styles<br/>(ARS, ERS, ...)" --> D[Measured response style<br/>technique - Weijters et al. 2008]
+    B -- "No / no valid measure" --> E[CFA marker technique<br/>or unmeasured latent<br/>method factor]
+    E --> F[Instrumental variables:<br/>possible in principle,<br/>hard in practice]
+```
+
+**Additional approaches:**
+
+- **Test interaction or quadratic hypotheses.** CMV cannot create these effects, so significant results cannot be blamed on CMV.
+- **Manipulate potential bias sources in the design** and test whether the results hold across conditions (Chan, in Brannick et al., 2010).
+
+::: {.callout-important}
+## Key principle
+There is **no single best remedy**. Remedies should be **tailored to the research question** and to the likely sources of bias. The goal is to make method bias a **less plausible rival explanation** for your findings.
+:::
+
+# Quick-Reference Facts
+
+- Method factors account for **~18–32%** of item variance (MTMM meta-analyses).
+- CMV inflates trait correlations by **~38–92%** (multi-method), and more with a single method.
+- Same-source correlations are **133–304%** of different-source correlations.
+- Response styles explained **27%** of the variance in correlations among consumer constructs.
+- Keep same-construct items **≥ 6 items apart**.
+- Label **all** scale points to reduce ambiguity.
+- Method bias can **inflate or deflate** correlations but **cannot create** interaction or quadratic effects.
+- The Lindell & Whitney marker technique is easy but makes many questionable assumptions. The CFA marker, directly measured, and measured response style techniques are stronger.
+
+# Applying This to My Survey Research
+
+Most of my Marketing Research projects (e.g., the Case 31 EFCU survey and the CEP Group 5 Qualtrics loyalty survey) are **single-source, single-time, self-report Likert surveys**. That is exactly the high-risk setting this article describes. For future studies I can:
+
+- **Design:** promise anonymity and say "no right or wrong answers," separate predictor and outcome blocks with buffer questions, vary scale formats or anchors where meaning is kept, label all scale points, and include a few reverse-worded items.
+- **Analysis:** add a theoretically unrelated marker variable to the questionnaire so a CFA marker test is possible later, or a short social desirability scale for the directly measured approach.
+- **Reporting:** acknowledge CMV as a limitation and describe which procedural remedies were used.
+
+# Appendix: GitHub Links {.appendix}
+
+| Item | Link |
+|---|---|
+| **GitHub repository** | <https://github.com/espinacecilia-design/6500> |
+| **Source file (.qmd)** | <https://github.com/espinacecilia-design/6500/blob/main/M12-Common-Method-Bias.qmd> |
+| **Published page (GitHub Pages)** | <https://espinacecilia-design.github.io/6500/M12-Common-Method-Bias.html> |
